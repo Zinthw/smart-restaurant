@@ -167,4 +167,50 @@ router.get('/:id/qr/download', async (req, res, next) => {
   }
 });
 
+router.post('/qr/regenerate-all', async (req, res, next) => {
+  try {
+    // Lấy tất cả các bàn đang hoạt động
+    const { rows: tables } = await db.query("SELECT * FROM tables WHERE status = 'active'");
+
+    if (tables.length === 0) {
+      return res.status(400).json({ message: 'No active tables found to regenerate.' });
+    }
+
+    console.log(`Starting bulk regeneration for ${tables.length} tables...`);
+
+    const updatePromises = tables.map(async (table) => {
+      const payload = {
+        tableId: table.id,
+        restaurantId: 'demo-restaurant',
+        // Thêm timestamp hiện tại vào payload để đảm bảo token luôn mới
+        generatedAt: Date.now() 
+      };
+
+      const newToken = jwt.sign(payload, process.env.QR_JWT_SECRET, { expiresIn: '30d' });
+
+      // Cập nhật vào Database
+      return db.query(
+        `UPDATE tables 
+         SET qr_token = $1, qr_token_created_at = NOW(), updated_at = NOW() 
+         WHERE id = $2`,
+        [newToken, table.id]
+      );
+    });
+
+    await Promise.all(updatePromises);
+
+    console.log("Bulk regeneration completed.");
+
+    res.json({
+      success: true,
+      message: `Successfully regenerated QR codes for ${tables.length} tables.`,
+      updatedCount: tables.length
+    });
+
+  } catch (err) {
+    console.error("Bulk Regenerate Error:", err);
+    next(err);
+  }
+});
+
 module.exports = router;

@@ -17,3 +17,7 @@ export const updateTableStatus = (id, status) =>
 
 export const generateQR = (id) => 
   axiosClient.post(`/admin/tables/${id}/qr/generate`);
+
+export const regenerateAllQRs = () => {
+  return axiosClient.post('/admin/tables/qr/regenerate-all');
+};
