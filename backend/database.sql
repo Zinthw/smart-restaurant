@@ -7,17 +7,20 @@ DROP TABLE IF EXISTS tables;
 -- 3. Tạo bảng tables
 CREATE TABLE tables (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    table_number VARCHAR(50) NOT NULL,
+    table_number VARCHAR(50) NOT NULL UNIQUE,
     capacity INT NOT NULL CHECK (capacity > 0 AND capacity <= 20),
     location VARCHAR(100),
     description TEXT,
     status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
-    qr_token VARCHAR(500),
+    qr_token TEXT,
     qr_token_created_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(table_number)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 4. Thêm indexes để tối ưu tìm kiếm
+CREATE INDEX idx_tables_status ON tables(status);
+CREATE INDEX idx_tables_location ON tables(location);
 
 -- 4. (Tùy chọn) Thêm sẵn một vài dữ liệu mẫu để test
 INSERT INTO tables (table_number, capacity, location, description) VALUES 

@@ -23,13 +23,22 @@ async function migrate() {
         location VARCHAR(100),
         description TEXT,
         status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
-        qr_token VARCHAR(500),
+        qr_token TEXT,
         qr_token_created_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log('✅ Tables created');
+    
+    // Create indexes for performance
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_tables_status ON tables(status);
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_tables_location ON tables(location);
+    `);
+    console.log('✅ Indexes created');
     
     // Insert sample data
     const { rowCount } = await pool.query(`SELECT COUNT(*) as count FROM tables`);
