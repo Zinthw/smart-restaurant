@@ -1,6 +1,6 @@
 import QRCode from "react-qr-code";
 import { toast } from "react-hot-toast";
-import { generateQR } from "../../api/tables.api";
+import { generateQR } from "../../../api/tables.api";
 
 export default function QRModal({ open, onClose, table, qrUrl, onRefresh }) {
   if (!open || !qrUrl) return null;

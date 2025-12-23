@@ -7,11 +7,11 @@ import {
   updateTableStatus,
   generateQR,
   regenerateAllQRs, 
-} from "../../api/tables.api";
-import AdminLayout from "../../components/layout/AdminLayout";
+} from "../../../api/tables.api";
+import AdminLayout from "../../../components/layout/AdminLayout";
 import TableFormModal from "./TableFormModal";
 import QRModal from "./QRModal";
-import ConfirmDialog from "../../components/ConfirmDialog";
+import ConfirmDialog from "../../../components/ConfirmDialog";
 
 export default function TableList() {
   const [tables, setTables] = useState([]);

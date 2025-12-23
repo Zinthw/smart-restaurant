@@ -3,33 +3,40 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast"; // Component thông báo
 
 // Import trang chính của bạn (nó sẽ tự tìm file index.jsx)
-import AdminTables from "./pages/AdminTables";
-import MenuVerify from "./pages/MenuVerify";
-
-// Giả sử bạn có layout chung (nếu chưa có thì bỏ qua bọc Layout)
-// import AdminLayout from './components/layouts/AdminLayout';
+import AdminLogin from './pages/Admin/Login';
+import AdminTables from "./pages/Admin/Tables";
+import MenuVerify from "./pages/Admin/Dashboard/MenuVerify";
 
 function App() {
   return (
-    // 1. BrowserRouter bọc toàn bộ ứng dụng
     <BrowserRouter>
-      {/* 2. Toaster để hiển thị thông báo ở góc màn hình (dùng cho các file hook/api) */}
       <Toaster position="top-right" reverseOrder={false} />
 
       <Routes>
-        {/* Redirect trang chủ về trang admin tables để tiện Demo */}
-        <Route path="/" element={<Navigate to="/admin/tables" replace />} />
+        {/* --- 1. LUỒNG ADMIN / STAFF --- */}
+        
+        {/* Trang Login riêng cho Admin: domain/admin/login */}
+        <Route path="/admin/login" element={<AdminLogin />} />
 
-        {/* Route chính của bài Assignment */}
+        {/* Các trang quản trị (Sau này sẽ bọc trong PrivateRoute để check login) */}
         <Route path="/admin/tables" element={<AdminTables />} />
-
-        {/* Route cho khách hàng quét QR */}
+        
+        
+        {/* --- 2. LUỒNG CUSTOMER --- */}
+        
+        {/* Khách quét QR code -> Vào menu */}
         <Route path="/menu" element={<MenuVerify />} />
 
-        {/* Route 404 nếu nhập sai link */}
+
+        {/* --- 3. ĐIỀU HƯỚNG MẶC ĐỊNH --- */}
+        
+        {/* Vào trang chủ domain.com -> Tự nhảy vào login admin (cho tiện dev lúc này) */}
+        <Route path="/" element={<Navigate to="/admin/login" replace />} />
+
+        {/* 404 Not Found */}
         <Route
           path="*"
-          element={<div className="p-10 text-center">404 - Not Found</div>}
+          element={<div className="p-10 text-center">404 - Trang không tồn tại</div>}
         />
       </Routes>
     </BrowserRouter>
