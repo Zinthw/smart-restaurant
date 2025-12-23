@@ -8,7 +8,8 @@ const router = express.Router();
 // Register new staff (Roles: staff, waiter, kitchen)
 router.post('/register', async (req, res, next) => {
   try {
-    const { email, password, role } = req.body;
+    const { password, role } = req.body;
+    const email = (req.body.email || '').trim().toLowerCase();
 
     // Validate Input
     if (!email || !password || !role) {
@@ -61,7 +62,8 @@ router.post('/register', async (req, res, next) => {
 // Login (For all roles including Admin)
 router.post('/login', async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = (req.body.email || '').trim().toLowerCase();
 
     // Find user
     const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
