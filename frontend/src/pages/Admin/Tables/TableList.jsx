@@ -8,7 +8,6 @@ import {
   generateQR,
   regenerateAllQRs, 
 } from "../../../api/tables.api";
-import AdminLayout from "../../../components/layout/AdminLayout";
 import TableFormModal from "./TableFormModal";
 import QRModal from "./QRModal";
 import ConfirmDialog from "../../../components/ConfirmDialog";
@@ -183,7 +182,7 @@ export default function TableList() {
   const uniqueLocations = [...new Set(tables.map((t) => t.location).filter(Boolean))];
 
   return (
-    <AdminLayout>
+    <>
       {/* Header */}
       <div className="admin-header">
         <div>
@@ -368,6 +367,6 @@ export default function TableList() {
         onConfirm={executeConfirmAction} // Gọi hàm trung gian thay vì gọi trực tiếp
         onCancel={() => setConfirm(null)}
       />
-    </AdminLayout>
+    </>
   );
 }
