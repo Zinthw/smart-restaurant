@@ -37,7 +37,8 @@ export default function ItemsPage() {
     status: 'active',
     is_recommended: false,      
     photos: [],                 
-    modifier_group_ids: []      
+    modifier_group_ids: [],
+    prep_time_minutes: 15      
   };
   const [formData, setFormData] = useState(initialForm);
 
@@ -301,7 +302,9 @@ export default function ItemsPage() {
                 <p className="menu-card-desc">{item.description || "Chưa có mô tả."}</p>
                 <div className="menu-card-meta">
                   <span className="menu-card-price">{Number(item.price).toLocaleString()}đ</span>
-                  <span className="menu-card-prep" style={{fontSize: 13, color: '#95a5a6'}}>⏱️ 15p</span>
+                  <span className="menu-card-prep" style={{fontSize: 13, color: '#95a5a6'}}>
+                    ⏱️ {item.prep_time_minutes || 0}p
+                  </span>
                 </div>
                 <div style={{display: 'flex', gap: 15, fontSize: 13, color: '#95a5a6', marginBottom: 15}}>
                    <span>{item.is_recommended ? '★ 5.0' : '★ 4.5'}</span>
@@ -371,8 +374,16 @@ export default function ItemsPage() {
                 {activeTab === 'info' && (
                   <>
                     <div className="form-group">
-                      <label className="form-label">Tên món ăn</label>
-                      <input className="form-input" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                      <label className="form-label">Tên món ăn (2-80 ký tự)</label>
+                      <input 
+                        className="form-input" 
+                        required 
+                        minLength={2} 
+                        maxLength={80} 
+                        value={formData.name} 
+                        onChange={e => setFormData({...formData, name: e.target.value})} 
+                        placeholder="Nhập tên món ăn..."
+                      />
                     </div>
                     <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15}}>
                       <div className="form-group">
@@ -387,29 +398,46 @@ export default function ItemsPage() {
                         <input type="number" className="form-input" required min="0" value={formData.price} onChange={e => setFormData({...formData, price: Number(e.target.value)})} />
                       </div>
                     </div>
+
+                    {/*Thời gian chuẩn bị & Trạng thái */}
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15}}>
+                      <div className="form-group">
+                        <label className="form-label">Thời gian chuẩn bị (phút)</label>
+                        <input 
+                          type="number" 
+                          className="form-input" 
+                          min="0" 
+                          max="240" 
+                          required
+                          value={formData.prep_time_minutes} 
+                          onChange={e => setFormData({...formData, prep_time_minutes: Number(e.target.value)})} 
+                        />
+                        <small style={{color: '#95a5a6', fontSize: '11px'}}>Tối đa 240 phút (4 tiếng)</small>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Trạng thái</label>
+                        <select className="form-input" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                          <option value="active">Đang bán (Available)</option>
+                          <option value="sold_out">Hết hàng (Sold Out)</option>
+                          <option value="inactive">Ngừng bán (Unavailable)</option>
+                        </select>
+                      </div>
+                    </div>
+                    
                     <div className="form-group">
                       <label className="form-label">Mô tả ngắn</label>
                       <textarea className="form-input" rows="3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})}></textarea>
                     </div>
-                    <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:15}}>
-                      <div className="form-group">
-                        <label className="form-label">Trạng thái</label>
-                        <select className="form-input" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
-                          <option value="active">Đang bán (Active)</option>
-                          <option value="sold_out">Hết hàng (Sold Out)</option>
-                          <option value="inactive">Ngừng bán (Inactive)</option>
-                        </select>
-                      </div>
-                      <div className="form-group" style={{display:'flex', alignItems:'center', paddingTop: 25}}>
-                        <input 
-                          type="checkbox" 
-                          id="recommend" 
-                          checked={formData.is_recommended} 
-                          onChange={e => setFormData({...formData, is_recommended: e.target.checked})}
-                          style={{width: 20, height: 20, marginRight: 10}}
-                        />
-                        <label htmlFor="recommend" style={{cursor:'pointer', fontWeight: 500}}>🔥 Món ngon (Chef Recommended)</label>
-                      </div>
+                    
+                    <div className="form-group" style={{display:'flex', alignItems:'center', paddingTop: 10}}>
+                      <input 
+                        type="checkbox" 
+                        id="recommend" 
+                        checked={formData.is_recommended} 
+                        onChange={e => setFormData({...formData, is_recommended: e.target.checked})}
+                        style={{width: 20, height: 20, marginRight: 10}}
+                      />
+                      <label htmlFor="recommend" style={{cursor:'pointer', fontWeight: 500}}>🔥 Món ngon (Chef Recommended)</label>
                     </div>
                   </>
                 )}
