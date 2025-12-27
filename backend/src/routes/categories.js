@@ -78,4 +78,19 @@ router.delete('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.patch('/:id/status', async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    if (!['active', 'inactive'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+    const { rows } = await db.query(
+      `UPDATE menu_categories SET status = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL RETURNING *`,
+      [status, req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ message: 'Category not found' });
+    res.json(rows[0]);
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
