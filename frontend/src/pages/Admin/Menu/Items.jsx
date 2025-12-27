@@ -382,7 +382,9 @@ export default function ItemsPage() {
       setShowModal(false);
     } catch (error) {
       console.error("Save error:", error);
-      toast.error("Lỗi lưu món: " + (error.response?.data?.message || "Vui lòng thử lại"));
+      toast.error(
+        "Lỗi lưu món: " + (error.response?.data?.message || "Vui lòng thử lại")
+      );
     }
   };
 
