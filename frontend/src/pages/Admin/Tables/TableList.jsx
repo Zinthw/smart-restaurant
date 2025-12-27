@@ -131,7 +131,7 @@ export default function TableList() {
 
   const handleDownloadAll = (format) => {
     const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem("admin_token");
     const url = `${apiUrl}/admin/tables/qr/download-all?format=${format}&token=${token}`;
     window.open(url, "_blank");
     toast.success(`Downloading all QR codes as ${format.toUpperCase()}...`);

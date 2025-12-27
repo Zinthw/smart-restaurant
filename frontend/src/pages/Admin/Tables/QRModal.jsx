@@ -6,7 +6,7 @@ export default function QRModal({ open, onClose, table, qrUrl, onRefresh }) {
   if (!open || !qrUrl) return null;
 
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("admin_token");
 
   // Hàm xử lý khi bấm nút Regenerate
   const handleRegenerate = async () => {
