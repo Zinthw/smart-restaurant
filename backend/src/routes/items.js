@@ -1,18 +1,40 @@
-const express = require('express');
-const db = require('../db');
+const express = require("express");
+const db = require("../db");
 const router = express.Router();
 
-router.get('/', async (req, res, next) => {
+router.get("/", async (req, res, next) => {
   try {
-    const { categoryId, category_id, q, search, status, sort_by = 'created_at', order = 'desc', page = 1, limit = 10 } = req.query;
-    
+    const {
+      categoryId,
+      category_id,
+      q,
+      search,
+      status,
+      sort_by = "created_at",
+      order = "desc",
+      page = 1,
+      limit = 10,
+    } = req.query;
+
     const filterCat = categoryId || category_id;
     const filterSearch = q || search;
 
     let query = `
-      SELECT i.*, c.name as category_name 
+      SELECT i.*,
+             c.name as category_name,
+             COALESCE(
+               json_agg(
+                 json_build_object(
+                   'id', p.id,
+                   'url', p.photo_url,
+                   'is_primary', p.is_primary
+                 )
+               ) FILTER (WHERE p.id IS NOT NULL),
+               '[]'
+             ) as photos
       FROM menu_items i
       LEFT JOIN menu_categories c ON i.category_id = c.id
+      LEFT JOIN menu_item_photos p ON p.menu_item_id = i.id
       WHERE i.deleted_at IS NULL
     `;
     const params = [];
@@ -31,31 +53,37 @@ router.get('/', async (req, res, next) => {
       params.push(status);
     }
 
-    const validSorts = ['price', 'name', 'created_at'];
-    const sortCol = validSorts.includes(sort_by) ? `i.${sort_by}` : 'i.created_at';
-    const sortDir = order === 'asc' ? 'ASC' : 'DESC';
-    query += ` ORDER BY ${sortCol} ${sortDir}`;
+    const validSorts = ["price", "name", "created_at"];
+    const sortCol = validSorts.includes(sort_by)
+      ? `i.${sort_by}`
+      : "i.created_at";
+    const sortDir = order === "asc" ? "ASC" : "DESC";
+    query += ` GROUP BY i.id, c.name ORDER BY ${sortCol} ${sortDir}`;
 
     const offset = (page - 1) * limit;
     query += ` LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
     params.push(limit, offset);
 
     const { rows } = await db.query(query, params);
-    
-    const countRes = await db.query("SELECT COUNT(*) FROM menu_items WHERE deleted_at IS NULL");
-    
+
+    const countRes = await db.query(
+      "SELECT COUNT(*) FROM menu_items WHERE deleted_at IS NULL"
+    );
+
     res.json({
       data: rows,
       pagination: {
         total: parseInt(countRes.rows[0].count),
         page: parseInt(page),
-        limit: parseInt(limit)
-      }
+        limit: parseInt(limit),
+      },
     });
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.get('/:id', async (req, res, next) => {
+router.get("/:id", async (req, res, next) => {
   try {
     const { rows } = await db.query(
       `SELECT i.*, c.name as category_name 
@@ -64,40 +92,57 @@ router.get('/:id', async (req, res, next) => {
        WHERE i.id = $1 AND i.deleted_at IS NULL`,
       [req.params.id]
     );
-    if (!rows[0]) return res.status(404).json({ message: 'Item not found' });
+    if (!rows[0]) return res.status(404).json({ message: "Item not found" });
     res.json(rows[0]);
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.post('/', async (req, res, next) => {
+router.post("/", async (req, res, next) => {
   try {
     const { category_id, name, description, price, status } = req.body;
-    
-    if (!name || name.trim().length === 0) return res.status(400).json({ message: 'Item name is required' });
-    if (!category_id) return res.status(400).json({ message: 'Category ID is required' });
-    if (price === undefined || price <= 0) return res.status(400).json({ message: 'Price must be greater than 0' });
 
-    const catCheck = await db.query("SELECT 1 FROM menu_categories WHERE id = $1", [category_id]);
-    if (catCheck.rowCount === 0) return res.status(400).json({ message: 'Category not found' });
+    if (!name || name.trim().length === 0)
+      return res.status(400).json({ message: "Item name is required" });
+    if (!category_id)
+      return res.status(400).json({ message: "Category ID is required" });
+    if (price === undefined || price <= 0)
+      return res.status(400).json({ message: "Price must be greater than 0" });
+
+    const catCheck = await db.query(
+      "SELECT 1 FROM menu_categories WHERE id = $1",
+      [category_id]
+    );
+    if (catCheck.rowCount === 0)
+      return res.status(400).json({ message: "Category not found" });
 
     const { rows } = await db.query(
       `INSERT INTO menu_items (category_id, name, description, price, status)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [category_id, name, description, price, status || 'available']
+      [category_id, name, description, price, status || "available"]
     );
     res.status(201).json(rows[0]);
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.put('/:id', async (req, res, next) => {
+router.put("/:id", async (req, res, next) => {
   try {
     const { category_id, name, description, price, status } = req.body;
-    
-    if (!name || name.trim().length === 0) return res.status(400).json({ message: 'Item name is required' });
-    if (price !== undefined && price <= 0) return res.status(400).json({ message: 'Price must be greater than 0' });
+
+    if (!name || name.trim().length === 0)
+      return res.status(400).json({ message: "Item name is required" });
+    if (price !== undefined && price <= 0)
+      return res.status(400).json({ message: "Price must be greater than 0" });
     if (category_id) {
-       const catCheck = await db.query("SELECT 1 FROM menu_categories WHERE id = $1", [category_id]);
-       if (catCheck.rowCount === 0) return res.status(400).json({ message: 'Category not found' });
+      const catCheck = await db.query(
+        "SELECT 1 FROM menu_categories WHERE id = $1",
+        [category_id]
+      );
+      if (catCheck.rowCount === 0)
+        return res.status(400).json({ message: "Category not found" });
     }
 
     const { rows } = await db.query(
@@ -106,20 +151,24 @@ router.put('/:id', async (req, res, next) => {
        WHERE id = $6 AND deleted_at IS NULL RETURNING *`,
       [category_id, name, description, price, status, req.params.id]
     );
-    if (!rows[0]) return res.status(404).json({ message: 'Item not found' });
+    if (!rows[0]) return res.status(404).json({ message: "Item not found" });
     res.json(rows[0]);
-  } catch (err) { next(err); }
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.delete('/:id', async (req, res, next) => {
+router.delete("/:id", async (req, res, next) => {
   try {
     const { rows } = await db.query(
       "UPDATE menu_items SET deleted_at = NOW() WHERE id = $1 RETURNING id",
       [req.params.id]
     );
-    if (!rows[0]) return res.status(404).json({ message: 'Item not found' });
-    res.json({ message: 'Item deleted successfully' });
-  } catch (err) { next(err); }
+    if (!rows[0]) return res.status(404).json({ message: "Item not found" });
+    res.json({ message: "Item deleted successfully" });
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;

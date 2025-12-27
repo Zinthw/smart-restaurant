@@ -1,51 +1,66 @@
-const express = require('express');
-const db = require('../db');
-const jwt = require('jsonwebtoken'); 
+const express = require("express");
+const db = require("../db");
+const jwt = require("jsonwebtoken");
 
 const router = express.Router();
 
-// API VERIFY QR CODE 
-router.get('/verify', async (req, res, next) => {
+// API VERIFY QR CODE
+router.get("/verify", async (req, res, next) => {
   try {
     const { tableId, token } = req.query;
 
     if (!tableId || !token) {
-      return res.status(400).json({ valid: false, code: 'MISSING_PARAMS', message: 'Missing authentication parameters.' });
+      return res
+        .status(400)
+        .json({
+          valid: false,
+          code: "MISSING_PARAMS",
+          message: "Missing authentication parameters.",
+        });
     }
 
     // Verify JWT Signature
     try {
       jwt.verify(token, process.env.QR_JWT_SECRET);
     } catch (err) {
-      return res.status(401).json({ 
-        valid: false, 
-        code: 'TOKEN_INVALID_SIGNATURE', 
-        message: 'Invalid QR code signature.' 
+      return res.status(401).json({
+        valid: false,
+        code: "TOKEN_INVALID_SIGNATURE",
+        message: "Invalid QR code signature.",
       });
     }
 
     // Check DB
-    const { rows } = await db.query('SELECT * FROM tables WHERE id = $1', [tableId]);
+    const { rows } = await db.query("SELECT * FROM tables WHERE id = $1", [
+      tableId,
+    ]);
     const table = rows[0];
 
     if (!table) {
-      return res.status(404).json({ valid: false, code: 'TABLE_NOT_FOUND', message: 'Table not found.' });
+      return res
+        .status(404)
+        .json({
+          valid: false,
+          code: "TABLE_NOT_FOUND",
+          message: "Table not found.",
+        });
     }
 
     // Check Token khớp trong DB (Chống dùng lại QR cũ)
     if (table.qr_token !== token) {
-      return res.status(401).json({ 
-        valid: false, 
-        code: 'TOKEN_EXPIRED_OR_REGENERATED', 
-        message: 'This QR code is no longer valid. Please ask staff for assistance.' 
+      return res.status(401).json({
+        valid: false,
+        code: "TOKEN_EXPIRED_OR_REGENERATED",
+        message:
+          "This QR code is no longer valid. Please ask staff for assistance.",
       });
     }
 
-    if (table.status !== 'active') {
-       return res.status(403).json({ 
-        valid: false, 
-        code: 'TABLE_INACTIVE', 
-        message: 'This table is currently inactive.' 
+    if (table.status !== "active") {
+      return res.status(403).json({
+        valid: false,
+        code: "TABLE_INACTIVE",
+        message: "This table is currently inactive.",
       });
     }
 
@@ -54,22 +69,25 @@ router.get('/verify', async (req, res, next) => {
       table: {
         id: table.id,
         number: table.table_number,
-        name: `Table ${table.table_number}`
-      }
+        name: `Table ${table.table_number}`,
+      },
     });
-
   } catch (err) {
     next(err);
   }
 });
 
-// API LẤY MENU CHO KHÁCH 
-router.get('/', async (req, res, next) => {
+// API LẤY MENU CHO KHÁCH
+router.get("/", async (req, res, next) => {
   try {
-    const { 
-      q, categoryId, chefRecommended, 
-      page = 1, limit = 100,
-      sort = 'created_at', order = 'desc' 
+    const {
+      q,
+      categoryId,
+      chefRecommended,
+      page = 1,
+      limit = 100,
+      sort = "created_at",
+      order = "desc",
     } = req.query;
 
     // A. Lấy Danh Mục (Active)
@@ -102,30 +120,47 @@ router.get('/', async (req, res, next) => {
       itemQuery += ` AND i.category_id = $${pIdx++}`;
       params.push(categoryId);
     }
-    if (chefRecommended === 'true') {
+    if (chefRecommended === "true") {
       itemQuery += ` AND i.is_chef_recommended = true`;
     }
 
-    // Sorting 
-    const validSorts = ['price', 'name', 'created_at'];
-    const sortCol = validSorts.includes(sort) ? `i.${sort}` : 'i.created_at';
-    const sortDir = order === 'asc' ? 'ASC' : 'DESC';
+    // Sorting
+    const validSorts = ["price", "name", "created_at"];
+    const sortCol = validSorts.includes(sort) ? `i.${sort}` : "i.created_at";
+    const sortDir = order === "asc" ? "ASC" : "DESC";
     itemQuery += ` ORDER BY ${sortCol} ${sortDir}`;
 
-    // Pagination 
+    // Pagination
     const limitVal = parseInt(limit);
     const offsetVal = (parseInt(page) - 1) * limitVal;
     itemQuery += ` LIMIT $${pIdx++} OFFSET $${pIdx++}`;
     params.push(limitVal, offsetVal);
 
     const itemRes = await db.query(itemQuery, params);
-    const items = itemRes.rows;
+    let items = itemRes.rows;
 
+    // Load all photos for each item
+    items = await Promise.all(
+      items.map(async (item) => {
+        const photosRes = await db.query(
+          `SELECT id, menu_item_id, photo_url as url, is_primary FROM menu_item_photos WHERE menu_item_id = $1 ORDER BY is_primary DESC, created_at ASC`,
+          [item.id]
+        );
+        return {
+          ...item,
+          photos: photosRes.rows || [],
+          primary_photo:
+            photosRes.rows && photosRes.rows.length > 0
+              ? photosRes.rows[0].url
+              : null,
+        };
+      })
+    );
     // C. Lấy Modifiers
     let modifiers = [];
     if (items.length > 0) {
-        const itemIds = items.map(it => `'${it.id}'`).join(',');
-        const modQuery = `
+      const itemIds = items.map((it) => `'${it.id}'`).join(",");
+      const modQuery = `
             SELECT 
                 mimg.menu_item_id,
                 mg.id as group_id, mg.name as group_name, mg.selection_type, mg.min_selection, mg.max_selection, mg.is_required,
@@ -136,45 +171,53 @@ router.get('/', async (req, res, next) => {
             WHERE mimg.menu_item_id IN (${itemIds}) AND mo.status = 'active'
             ORDER BY mimg.sort_order ASC, mo.price_adjustment ASC
         `;
-        const modRes = await db.query(modQuery);
-        modifiers = modRes.rows;
+      const modRes = await db.query(modQuery);
+      modifiers = modRes.rows;
     }
 
     // D. Ghép dữ liệu (Stitching)
-    items.forEach(item => {
-        const myMods = modifiers.filter(m => m.menu_item_id === item.id);
-        const groupsMap = {};
-        myMods.forEach(row => {
-            if (!groupsMap[row.group_id]) {
-                groupsMap[row.group_id] = {
-                    id: row.group_id, name: row.group_name, 
-                    selection_type: row.selection_type, is_required: row.is_required,
-                    min_selection: row.min_selection, max_selection: row.max_selection,
-                    options: []
-                };
-            }
-            if (row.option_id) {
-                groupsMap[row.group_id].options.push({
-                    id: row.option_id, name: row.option_name, price_adjustment: row.price_adjustment
-                });
-            }
-        });
-        item.modifiers = Object.values(groupsMap);
+    items.forEach((item) => {
+      const myMods = modifiers.filter((m) => m.menu_item_id === item.id);
+      const groupsMap = {};
+      myMods.forEach((row) => {
+        if (!groupsMap[row.group_id]) {
+          groupsMap[row.group_id] = {
+            id: row.group_id,
+            name: row.group_name,
+            selection_type: row.selection_type,
+            is_required: row.is_required,
+            min_selection: row.min_selection,
+            max_selection: row.max_selection,
+            options: [],
+          };
+        }
+        if (row.option_id) {
+          groupsMap[row.group_id].options.push({
+            id: row.option_id,
+            name: row.option_name,
+            price_adjustment: row.price_adjustment,
+          });
+        }
+      });
+      item.modifiers = Object.values(groupsMap);
     });
 
-    const result = categories.map(cat => {
+    const result = categories
+      .map((cat) => {
         return {
-            ...cat,
-            items: items.filter(it => it.category_id === cat.id)
+          ...cat,
+          items: items.filter((it) => it.category_id === cat.id),
         };
-    }).filter(cat => cat.items.length > 0);
-    
-    res.json({
-        data: result,
-        pagination: { page: parseInt(page), limit: limitVal }
-    });
+      })
+      .filter((cat) => cat.items.length > 0);
 
-  } catch (err) { next(err); }
+    res.json({
+      data: result,
+      pagination: { page: parseInt(page), limit: limitVal },
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 module.exports = router;
