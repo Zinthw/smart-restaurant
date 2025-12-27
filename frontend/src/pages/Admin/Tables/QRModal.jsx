@@ -6,6 +6,7 @@ export default function QRModal({ open, onClose, table, qrUrl, onRefresh }) {
   if (!open || !qrUrl) return null;
 
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+  const token = localStorage.getItem("token");
 
   // Hàm xử lý khi bấm nút Regenerate
   const handleRegenerate = async () => {
@@ -121,7 +122,7 @@ export default function QRModal({ open, onClose, table, qrUrl, onRefresh }) {
               }}
             >
               <a
-                href={`${apiUrl}/admin/tables/${table.id}/qr/download?format=png`}
+                href={`${apiUrl}/admin/tables/${table.id}/qr/download?format=png&token=${token}`}
                 target="_blank"
                 className="btn-primary"
                 style={{ textAlign: "center", textDecoration: "none" }}
@@ -129,7 +130,7 @@ export default function QRModal({ open, onClose, table, qrUrl, onRefresh }) {
                 ⬇️ Download PNG Image
               </a>
               <a
-                href={`${apiUrl}/admin/tables/${table.id}/qr/download?format=pdf`}
+                href={`${apiUrl}/admin/tables/${table.id}/qr/download?format=pdf&token=${token}`}
                 target="_blank"
                 className="btn-secondary"
                 style={{ textAlign: "center", textDecoration: "none" }}

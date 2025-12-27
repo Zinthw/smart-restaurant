@@ -1,8 +1,14 @@
 const jwt = require('jsonwebtoken');
 
 const requireAuth = (req, res, next) => {
+  // Check token from header first, then query string (for downloads)
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  let token = authHeader && authHeader.split(' ')[1];
+  
+  // If no token in header, check query string
+  if (!token && req.query.token) {
+    token = req.query.token;
+  }
 
   if (!token) {
     return res.status(401).json({ message: 'Authentication required (Missing Token)' });

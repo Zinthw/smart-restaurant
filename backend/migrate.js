@@ -1,20 +1,22 @@
-require('dotenv').config();
-const { Pool } = require('pg');
-const bcrypt = require('bcrypt');
+require("dotenv").config();
+const { Pool } = require("pg");
+const bcrypt = require("bcrypt");
 
 // Kết nối Database
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl:
+    process.env.NODE_ENV === "production"
+      ? { rejectUnauthorized: false }
+      : false,
 });
 
 async function migrate() {
   try {
-    console.log('🔄 Đang chạy migration...');
-    
+    console.log("🔄 Đang chạy migration...");
+
     // 1. Cài đặt Extension UUID
     await pool.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
-    
 
     // Xóa bảng cũ để tạo bảng mới.
     // await pool.query(`DROP TABLE IF EXISTS menu_item_photos CASCADE;`);
@@ -24,7 +26,7 @@ async function migrate() {
     // await pool.query(`DROP TABLE IF EXISTS menu_items CASCADE;`);
     // await pool.query(`DROP TABLE IF EXISTS menu_categories CASCADE;`);
 
-    // 2. Tạo bảng TABLES 
+    // 2. Tạo bảng TABLES
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tables (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -41,7 +43,7 @@ async function migrate() {
     `);
     console.log('✅ Table "tables" ready');
 
-    // Tạo bảng USERS 
+    // Tạo bảng USERS
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -105,7 +107,7 @@ async function migrate() {
     `);
     console.log('✅ Columns "prep_time_minutes" and "order_count" ensured');
 
-    // MENU ITEM PHOTOS (Ảnh món) 
+    // MENU ITEM PHOTOS (Ảnh món)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS menu_item_photos (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -117,7 +119,7 @@ async function migrate() {
     `);
     console.log('✅ Table "menu_item_photos" ready');
 
-    // MODIFIER GROUPS (Nhóm Topping/Size) 
+    // MODIFIER GROUPS (Nhóm Topping/Size)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS modifier_groups (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -132,7 +134,7 @@ async function migrate() {
     `);
     console.log('✅ Table "modifier_groups" ready');
 
-    // MODIFIER OPTIONS (Các lựa chọn con) 
+    // MODIFIER OPTIONS (Các lựa chọn con)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS modifier_options (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -159,19 +161,18 @@ async function migrate() {
     // Tạo User Admin mẫu (Seeding nếu chạy lần đầu)
     // const adminEmail = 'admin@restaurant.com';
     // const hash = await bcrypt.hash('123456', 10);
-    
+
     // await pool.query(`
     //   INSERT INTO users (email, password_hash, role, status)
     //   VALUES ($1, $2, 'admin', 'active')
     // `, [adminEmail, hash]);
-    
+
     // console.log(`🎉 Tạo Admin mẫu thành công: ${adminEmail} / 123456`);
 
-    console.log('✅ MIGRATION HOÀN TẤT!');
+    console.log("✅ MIGRATION HOÀN TẤT!");
     process.exit(0);
-
   } catch (err) {
-    console.error('❌ Migration thất bại:', err);
+    console.error("❌ Migration thất bại:", err);
     process.exit(1);
   }
 }
