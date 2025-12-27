@@ -1,6 +1,9 @@
 import axiosClient from "./axiosClient";
 
 export const menuApi = {
+  // --- PUBLIC MENU (For Guest) ---
+  getPublicMenu: (params) => axiosClient.get("/menu", { params }),
+
   // --- CATEGORIES ---
   getCategories: () => axiosClient.get("/admin/menu/categories"),
   createCategory: (data) => axiosClient.post("/admin/menu/categories", data),
@@ -14,6 +17,8 @@ export const menuApi = {
   createItem: (data) => axiosClient.post("/admin/menu/items", data),
   updateItem: (id, data) => axiosClient.put(`/admin/menu/items/${id}`, data),
   deleteItem: (id) => axiosClient.delete(`/admin/menu/items/${id}`),
+  updateItemStatus: (id, status) =>
+    axiosClient.patch(`/admin/menu/items/${id}/status`, { status }),
 
   // --- MODIFIERS (Nhóm topping/size) ---
   getModifierGroups: () => axiosClient.get("/admin/menu/modifier-groups"),
@@ -33,4 +38,8 @@ export const menuApi = {
     axiosClient.post(`/admin/menu/items/${itemId}/modifier-groups`, {
       groupIds,
     }),
+  updateCategoryStatus: (id, status) =>
+    axiosClient.patch(`/admin/menu/categories/${id}/status`, { status }),
+  setPhotoAsPrimary: (itemId, photoId) =>
+    axiosClient.patch(`/admin/menu/items/${itemId}/photos/${photoId}/primary`),
 };

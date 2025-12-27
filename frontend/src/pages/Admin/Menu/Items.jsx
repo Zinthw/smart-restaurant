@@ -46,8 +46,13 @@ export default function ItemsPage() {
     const initData = async () => {
       setLoading(true);
       try {
+        // Map frontend sort to backend API sort_by param
+        let sortParam = "created_at";
+        if (sortBy === "price_low" || sortBy === "price_high") sortParam = "price";
+        if (sortBy === "popular") sortParam = "popularity";
+
         const [itemsRes, catsRes, modsRes] = await Promise.all([
-          menuApi.getItems({ page: 1, limit: 500 }), // tăng limit để load đủ dữ liệu
+          menuApi.getItems({ page: 1, limit: 500, sort_by: sortParam }),
           menuApi.getCategories(),
           menuApi.getModifierGroups(),
         ]);

@@ -53,10 +53,15 @@ router.get("/", async (req, res, next) => {
       params.push(status);
     }
 
-    const validSorts = ["price", "name", "created_at"];
-    const sortCol = validSorts.includes(sort_by)
-      ? `i.${sort_by}`
-      : "i.created_at";
+    const validSorts = ["price", "name", "created_at", "popularity"];
+    let sortCol = "i.created_at";
+    if (validSorts.includes(sort_by)) {
+      if (sort_by === "popularity") {
+        sortCol = "COALESCE(i.order_count, 0)";
+      } else {
+        sortCol = `i.${sort_by}`;
+      }
+    }
     const sortDir = order === "asc" ? "ASC" : "DESC";
     query += ` GROUP BY i.id, c.name ORDER BY ${sortCol} ${sortDir}`;
 
@@ -101,7 +106,7 @@ router.get("/:id", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
-    const { category_id, name, description, price, status } = req.body;
+    const { category_id, name, description, price, status, prep_time_minutes, is_chef_recommended } = req.body;
 
     if (!name || name.trim().length === 0)
       return res.status(400).json({ message: "Item name is required" });
@@ -109,6 +114,8 @@ router.post("/", async (req, res, next) => {
       return res.status(400).json({ message: "Category ID is required" });
     if (price === undefined || price <= 0)
       return res.status(400).json({ message: "Price must be greater than 0" });
+    if (prep_time_minutes !== undefined && (prep_time_minutes < 0 || prep_time_minutes > 240))
+      return res.status(400).json({ message: "Prep time must be 0-240 minutes" });
 
     const catCheck = await db.query(
       "SELECT 1 FROM menu_categories WHERE id = $1",
@@ -118,9 +125,9 @@ router.post("/", async (req, res, next) => {
       return res.status(400).json({ message: "Category not found" });
 
     const { rows } = await db.query(
-      `INSERT INTO menu_items (category_id, name, description, price, status)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [category_id, name, description, price, status || "available"]
+      `INSERT INTO menu_items (category_id, name, description, price, status, prep_time_minutes, is_chef_recommended)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [category_id, name, description, price, status || "available", prep_time_minutes || 0, is_chef_recommended || false]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -130,12 +137,14 @@ router.post("/", async (req, res, next) => {
 
 router.put("/:id", async (req, res, next) => {
   try {
-    const { category_id, name, description, price, status } = req.body;
+    const { category_id, name, description, price, status, prep_time_minutes, is_chef_recommended } = req.body;
 
     if (!name || name.trim().length === 0)
       return res.status(400).json({ message: "Item name is required" });
     if (price !== undefined && price <= 0)
       return res.status(400).json({ message: "Price must be greater than 0" });
+    if (prep_time_minutes !== undefined && (prep_time_minutes < 0 || prep_time_minutes > 240))
+      return res.status(400).json({ message: "Prep time must be 0-240 minutes" });
     if (category_id) {
       const catCheck = await db.query(
         "SELECT 1 FROM menu_categories WHERE id = $1",
@@ -147,9 +156,11 @@ router.put("/:id", async (req, res, next) => {
 
     const { rows } = await db.query(
       `UPDATE menu_items 
-       SET category_id = $1, name = $2, description = $3, price = $4, status = $5, updated_at = NOW()
-       WHERE id = $6 AND deleted_at IS NULL RETURNING *`,
-      [category_id, name, description, price, status, req.params.id]
+       SET category_id = COALESCE($1, category_id), name = COALESCE($2, name), description = COALESCE($3, description), 
+           price = COALESCE($4, price), status = COALESCE($5, status), prep_time_minutes = COALESCE($6, prep_time_minutes),
+           is_chef_recommended = COALESCE($7, is_chef_recommended), updated_at = NOW()
+       WHERE id = $8 AND deleted_at IS NULL RETURNING *`,
+      [category_id, name, description, price, status, prep_time_minutes, is_chef_recommended, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ message: "Item not found" });
     res.json(rows[0]);
@@ -166,6 +177,23 @@ router.delete("/:id", async (req, res, next) => {
     );
     if (!rows[0]) return res.status(404).json({ message: "Item not found" });
     res.json({ message: "Item deleted successfully" });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch("/:id/status", async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    if (!['available', 'unavailable', 'sold_out'].includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+    const { rows } = await db.query(
+      `UPDATE menu_items SET status = $1, updated_at = NOW() WHERE id = $2 AND deleted_at IS NULL RETURNING *`,
+      [status, req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ message: "Item not found" });
+    res.json(rows[0]);
   } catch (err) {
     next(err);
   }

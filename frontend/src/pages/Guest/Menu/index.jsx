@@ -29,16 +29,52 @@ export default function GuestMenu() {
     const initData = async () => {
       setLoading(true);
       try {
-        const [itemsRes, catsRes, modsRes] = await Promise.all([
-          menuApi.getItems(),
-          menuApi.getCategories(),
-          menuApi.getModifierGroups()
-        ]);
-        setItems(itemsRes.data.data || []);
-        setCategories(catsRes.data.data || []);
-        setModifierGroups(modsRes.data.data || []);
+        // Gọi public menu endpoint (trả về data theo danh mục)
+        const menuRes = await menuApi.getPublicMenu();
+        const menuData = menuRes.data?.data || [];
+
+        // Flatten categories + items từ response
+        const allCats = [];
+        const allItems = [];
+        const allMods = {};
+
+        menuData.forEach((cat) => {
+          allCats.push({ id: cat.id, name: cat.name });
+          if (cat.items && Array.isArray(cat.items)) {
+            cat.items.forEach((item) => {
+              allItems.push({
+                id: item.id,
+                name: item.name,
+                price: item.price,
+                category_id: item.category_id,
+                status: item.status || 'available',
+                description: item.description,
+                is_recommended: item.is_chef_recommended,
+                photos: item.photos || [],
+                modifier_group_ids: item.modifiers ? item.modifiers.map(m => m.id) : []
+              });
+              // Ghép modifiers
+              if (item.modifiers && Array.isArray(item.modifiers)) {
+                item.modifiers.forEach((mod) => {
+                  if (!allMods[mod.id]) {
+                    allMods[mod.id] = {
+                      id: mod.id,
+                      name: mod.name,
+                      selection_type: mod.selection_type === 'single' ? 'single' : 'multi',
+                      options: mod.options || []
+                    };
+                  }
+                });
+              }
+            });
+          }
+        });
+
+        setCategories(allCats);
+        setItems(allItems);
+        setModifierGroups(Object.values(allMods));
       } catch (error) {
-        console.log("Guest: Dùng Mock Data");
+        console.log("Guest: Lỗi load API, dùng Mock Data", error);
         setCategories([
           { id: 1, name: 'Món Khai Vị' },
           { id: 2, name: 'Món Chính' },
@@ -109,7 +145,7 @@ export default function GuestMenu() {
     let extraPrice = 0;
     Object.values(selectedOptions).forEach(optionsArray => {
       optionsArray.forEach(opt => {
-        extraPrice += opt.price;
+        extraPrice += opt.price || opt.price_adjustment || 0;
       });
     });
     return selectedItem.price + extraPrice;
@@ -298,7 +334,7 @@ export default function GuestMenu() {
                           />
                           <div className="mod-option-info">
                             <span>{opt.name}</span>
-                            {opt.price > 0 && <span className="opt-price">+{opt.price.toLocaleString()}đ</span>}
+                            {(opt.price || opt.price_adjustment) > 0 && <span className="opt-price">+{((opt.price || opt.price_adjustment) || 0).toLocaleString()}đ</span>}
                           </div>
                         </label>
                       ))}
