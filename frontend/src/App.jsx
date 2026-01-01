@@ -18,9 +18,14 @@ import ItemsPage from "./pages/Admin/Menu/Items";
 import CategoriesPage from "./pages/Admin/Menu/Categories";
 import ModifiersPage from "./pages/Admin/Menu/Modifiers";
 
-// Pages - Customer/Guest (Đồng bộ dùng tên Customer)
+// Pages - Customer/Guest
 import GuestMenu from "./pages/Guest/Menu/index";
 import CustomerLogin from "./pages/Guest/Login/index";
+import CustomerRegister from "./pages/Guest/Register/index";
+import GoogleCallback from "./pages/Auth/GoogleCallback";
+
+// Pages - Waiter
+import WaiterOrders from "./pages/Waiter/Orders";
 
 function App() {
   return (
@@ -28,7 +33,7 @@ function App() {
       <Toaster position="top-right" reverseOrder={false} />
 
       <Routes>
-        {/* --- 1. LUỒNG ADMIN / STAFF --- */}
+        {/* 1. LUỒNG ADMIN */}
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route
           path="/admin/tables"
@@ -71,20 +76,20 @@ function App() {
           }
         />
 
-        {/* --- 2. LUỒNG CUSTOMER (KHÁCH HÀNG) --- */}
-
-        {/* CustomerLogin */}
+        {/* 2. LUỒNG CUSTOMER */}
+        <Route path="/login" element={<CustomerLogin />} />
         <Route path="/customer/login" element={<CustomerLogin />} />
-
-        {/* Cổng xác thực QR Code */}
+        <Route path="/register" element={<CustomerRegister />} />
+        <Route path="/customer/register" element={<CustomerRegister />} />
+        <Route path="/auth/google/success" element={<GoogleCallback />} />
         <Route path="/menu" element={<MenuVerify />} />
-
-        {/* Trang thực đơn chính cho khách */}
         <Route path="/menu/guest" element={<GuestMenu />} />
 
-        {/* --- 3. ĐIỀU HƯỚNG MẶC ĐỊNH --- */}
-        <Route path="/" element={<Navigate to="/admin/login" replace />} />
+        {/* 3. LUỒNG WAITER */}
+        <Route path="/waiter/orders" element={<WaiterOrders />} />
 
+        {/* 4. ĐIỀU HƯỚNG MẶC ĐỊNH */}
+        <Route path="/" element={<Navigate to="/admin/login" replace />} />
         <Route
           path="*"
           element={

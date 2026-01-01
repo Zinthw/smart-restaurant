@@ -75,12 +75,12 @@ export default function TableList() {
     try {
       if (selectedTable) await updateTable(selectedTable.id, data);
       else await createTable(data);
-      toast.success(selectedTable ? "Table updated!" : "Table created!");
+      toast.success(selectedTable ? "Cập nhật bàn thành công!" : "Tạo bàn mới thành công!");
       setShowForm(false);
       setSelectedTable(null);
       loadTables();
     } catch (error) {
-      toast.error("Error saving table");
+      toast.error("Lỗi khi lưu thông tin bàn");
     }
   };
 
@@ -104,11 +104,11 @@ export default function TableList() {
         table.id,
         table.status === "active" ? "inactive" : "active"
       );
-      toast.success("Status updated!");
+      toast.success("Cập nhật trạng thái thành công!");
       setConfirm(null);
       loadTables();
     } catch (error) {
-      toast.error("Error updating status");
+      toast.error("Lỗi khi cập nhật trạng thái");
     }
   };
 
@@ -118,12 +118,12 @@ export default function TableList() {
       setLoading(true);
       // Gọi API regenerate all (giả định backend trả về success)
       await regenerateAllQRs();
-      toast.success("All QR Codes regenerated successfully!");
+      toast.success("Tạo lại tất cả mã QR thành công!");
       setConfirm(null); // Đóng modal
       loadTables(); // Tải lại để update timestamp mới (nếu có hiển thị)
     } catch (error) {
       console.error(error);
-      toast.error("Failed to regenerate QR codes");
+      toast.error("Lỗi khi tạo lại mã QR");
     } finally {
       setLoading(false);
     }
@@ -134,7 +134,7 @@ export default function TableList() {
     const token = localStorage.getItem("admin_token");
     const url = `${apiUrl}/admin/tables/qr/download-all?format=${format}&token=${token}`;
     window.open(url, "_blank");
-    toast.success(`Downloading all QR codes as ${format.toUpperCase()}...`);
+    toast.success(`Đang tải xuống tất cả mã QR dạng ${format.toUpperCase()}...`);
   };
 
   const handleGenerateQR = async (table) => {
@@ -145,11 +145,11 @@ export default function TableList() {
         setQrUrl(url);
         setSelectedTable(table);
         setShowQR(true);
-        toast.success("QR Generated!");
+        toast.success("Tạo mã QR thành công!");
         loadTables();
       }
     } catch (error) {
-      toast.error("Error generating QR");
+      toast.error("Lỗi khi tạo mã QR");
     }
   };
 
@@ -157,15 +157,26 @@ export default function TableList() {
     try {
       setLoading(true);
       await deleteTable(table.id);
-      toast.success("Table deleted!");
+      toast.success("Xóa bàn thành công!");
       setConfirm(null);
       loadTables();
     } catch (error) {
       console.error("❌ Lỗi khi xóa bàn:", error);
-      toast.error("Error deleting table");
+      toast.error("Lỗi khi xóa bàn");
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function để chuyển location sang tiếng Việt
+  const translateLocation = (location) => {
+    const locationMap = {
+      'Indoor': 'Trong Nhà',
+      'Outdoor': 'Ngoài Trời',
+      'VIP Room': 'Phòng VIP',
+      'VIP': 'Phòng VIP'
+    };
+    return locationMap[location] || location;
   };
 
   const getFilteredTables = () => {
@@ -232,8 +243,8 @@ export default function TableList() {
       {/* Header */}
       <div className="admin-header">
         <div>
-          <h1 className="page-title">Table Management</h1>
-          <p className="page-subtitle">Manage tables and generate QR codes</p>
+          <h1 className="page-title">Quản Lý Bàn</h1>
+          <p className="page-subtitle">Quản lý bàn và tạo mã QR</p>
         </div>
         <button
           className="btn-primary"
@@ -242,7 +253,7 @@ export default function TableList() {
             setShowForm(true);
           }}
         >
-          + Add Table
+          + Thêm Bàn
         </button>
       </div>
 
@@ -261,7 +272,7 @@ export default function TableList() {
           </div>
           <div className="stat-content">
             <div className="stat-value">{totalTables}</div>
-            <div className="stat-label">Total Tables</div>
+            <div className="stat-label">Tổng Số Bàn</div>
           </div>
         </div>
         <div className="stat-card">
@@ -273,7 +284,7 @@ export default function TableList() {
           </div>
           <div className="stat-content">
             <div className="stat-value">{activeTables}</div>
-            <div className="stat-label">Active (Available)</div>
+            <div className="stat-label">Đang Hoạt Động</div>
           </div>
         </div>
         <div className="stat-card">
@@ -285,7 +296,7 @@ export default function TableList() {
           </div>
           <div className="stat-content">
             <div className="stat-value">{inactiveTables}</div>
-            <div className="stat-label">Inactive</div>
+            <div className="stat-label">Không Hoạt Động</div>
           </div>
         </div>
       </div>
@@ -293,7 +304,7 @@ export default function TableList() {
       {/* Main Table Grid Area */}
       <div className="table-card">
         <div className="table-header">
-          <h3>All Tables</h3>
+          <h3>Tất Cả Bàn</h3>
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
             {/* Regenerate All */}
             <button
@@ -307,96 +318,57 @@ export default function TableList() {
                 setConfirm({
                   type: "REGEN_ALL",
                   message:
-                    "WARNING: This will invalidate ALL existing QR codes. Customers will need to rescan the new codes. Are you sure?",
+                    "CẢNH BÁO: Thao tác này sẽ vô hiệu hóa TẤT CẢ mã QR hiện có. Khách hàng sẽ cần quét lại mã mới. Bạn có chắc chắn?",
                 })
               }
             >
-              🔄 Regenerate All QR
+              🔄 Tạo Lại Tất Cả QR
             </button>
 
             <button
               className="btn-secondary"
               onClick={() => handleDownloadAll("png")}
             >
-              ⬇️ Download All (ZIP)
+              ⬇️ Tải Tất Cả (ZIP)
             </button>
             <button
               className="btn-secondary"
               onClick={() => handleDownloadAll("pdf")}
             >
-              📄 Download All (PDF)
+              📄 Tải Tất Cả (PDF)
             </button>
           </div>
         </div>
 
         {/* Filter Area */}
-        <div
-          style={{
-            padding: "15px",
-            borderBottom: "1px solid #eee",
-            background: "#f9fafb",
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "10px",
-            alignItems: "center",
-          }}
-        >
-          <div style={{ flex: 1, minWidth: "200px", position: "relative" }}>
-            <span
-              style={{
-                position: "absolute",
-                left: "10px",
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: "#9ca3af",
-              }}
-            >
-              🔍
-            </span>
+        <div className="filters-bar">
+          <div className="search-box">
+            <span style={{ color: "#95a5a6", fontSize: 18 }}>🔍</span>
             <input
               type="text"
-              placeholder="Search table number..."
+              placeholder="Tìm số bàn..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "8px 10px 8px 35px",
-                border: "1px solid #d1d5db",
-                borderRadius: "6px",
-                outline: "none",
-              }}
             />
           </div>
           <select
+            className="filter-select"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            style={{
-              padding: "8px",
-              border: "1px solid #d1d5db",
-              borderRadius: "6px",
-              outline: "none",
-              cursor: "pointer",
-            }}
           >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
+            <option value="all">Tất Cả Trạng Thái</option>
+            <option value="active">Đang Hoạt Động</option>
+            <option value="inactive">Không Hoạt Động</option>
           </select>
           <select
+            className="filter-select"
             value={locationFilter}
             onChange={(e) => setLocationFilter(e.target.value)}
-            style={{
-              padding: "8px",
-              border: "1px solid #d1d5db",
-              borderRadius: "6px",
-              outline: "none",
-              cursor: "pointer",
-            }}
           >
-            <option value="all">All Locations</option>
-            <option value="Indoor">Indoor</option>
-            <option value="Outdoor">Outdoor</option>
-            <option value="VIP Room">VIP Room</option>
+            <option value="all">Tất Cả Vị Trí</option>
+            <option value="Indoor">Trong Nhà</option>
+            <option value="Outdoor">Ngoài Trời</option>
+            <option value="VIP Room">Phòng VIP</option>
             {uniqueLocations.map(
               (loc) =>
                 !["Indoor", "Outdoor", "VIP Room"].includes(loc) && (
@@ -407,24 +379,18 @@ export default function TableList() {
             )}
           </select>
           <select
+            className="filter-select"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            style={{
-              padding: "8px",
-              border: "1px solid #d1d5db",
-              borderRadius: "6px",
-              outline: "none",
-              cursor: "pointer",
-            }}
           >
-            <option value="number_asc">Sort: Table No. (Asc)</option>
-            <option value="capacity_desc">Sort: Capacity (High-Low)</option>
-            <option value="capacity_asc">Sort: Capacity (Low-High)</option>
+            <option value="number_asc">Sắp Xếp: Số Bàn (Tăng Dần)</option>
+            <option value="capacity_desc">Sắp Xếp: Sức Chứa (Cao-Thấp)</option>
+            <option value="capacity_asc">Sắp Xếp: Sức Chứa (Thấp-Cao)</option>
           </select>
         </div>
 
         {loading ? (
-          <div className="p-5 text-center">Loading...</div>
+          <div className="p-5 text-center">Đang tải...</div>
         ) : (
           <div className="tables-grid">
             {filteredTables.length > 0 ? (
@@ -441,12 +407,12 @@ export default function TableList() {
                       t.status === "active" ? "available" : "inactive"
                     }`}
                   >
-                    {t.status === "active" ? "✅ Available" : "🚫 Inactive"}
+                    {t.status === "active" ? "✅ Sẵn Sàng" : "🚫 Không Hoạt Động"}
                   </div>
                   <div className="table-info">
-                    <span>{t.capacity} seats</span>
+                    <span>{t.capacity} chỗ</span>
                     <span>•</span>
-                    <span>{t.location}</span>
+                    <span>{translateLocation(t.location)}</span>
                   </div>
                   <div className="table-session">
                     {t.qrToken ? (
@@ -454,11 +420,11 @@ export default function TableList() {
                         className="session-detail"
                         style={{ color: "green" }}
                       >
-                        QR Ready
+                        QR Sẵn Sàng
                       </div>
                     ) : (
                       <div className="session-detail" style={{ color: "gray" }}>
-                        No QR
+                        Chưa Có QR
                       </div>
                     )}
                   </div>
@@ -476,7 +442,7 @@ export default function TableList() {
                         setSelectedTable(t);
                         setShowForm(true);
                       }}
-                      title="Edit"
+                      title="Chỉnh Sửa"
                     >
                       ✏️
                     </button>
@@ -520,7 +486,7 @@ export default function TableList() {
                   color: "#666",
                 }}
               >
-                No tables found matching your filters.
+                Không tìm thấy bàn nào phù hợp với bộ lọc.
               </div>
             )}
           </div>
@@ -544,7 +510,7 @@ export default function TableList() {
       {/* Confirm Dialog được nâng cấp để xử lý động */}
       <ConfirmDialog
         open={!!confirm}
-        title="Confirm Action"
+        title="Xác Nhận Thao Tác"
         message={confirm?.message}
         onConfirm={executeConfirmAction} // Gọi hàm trung gian thay vì gọi trực tiếp
         onCancel={() => setConfirm(null)}

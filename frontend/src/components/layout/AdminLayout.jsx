@@ -12,7 +12,7 @@ export default function AdminLayout({ children }) {
   const userEmail = localStorage.getItem("userEmail") || "Admin User";
   const userRole = localStorage.getItem("role") || "Staff";
   // Lấy chữ cái đầu của Email để làm Avatar
-  const avatarLetter = userEmail.charAt(0).toUpperCase();
+  const avatarLetter = userEmail.charAt(0).toUpperCase(); 
 
   const allowedRoutes = [
     '/admin/menu/items',
@@ -74,21 +74,21 @@ export default function AdminLayout({ children }) {
         </div>
 
         <nav className="sidebar-nav">
-          {renderNavLink('/admin/dashboard', '📊', 'Dashboard')}
-          {renderNavLink('/admin/orders', '📋', 'Orders', '5')}
+          {renderNavLink('/admin/dashboard', '📊', 'Tổng Quan')}
+          {renderNavLink('/admin/orders', '📋', 'Đơn Hàng', '5')}
           
           <div style={{margin: '10px 20px', borderTop: '1px solid rgba(255,255,255,0.1)'}}></div>
           
-          {renderNavLink('/admin/menu/items', '🍔', 'Menu Items')}
-          {renderNavLink('/admin/menu/categories', '📂', 'Categories')}
-          {renderNavLink('/admin/menu/modifiers', '✨', 'Modifiers')}
+          {renderNavLink('/admin/menu/items', '🍔', 'Món Ăn')}
+          {renderNavLink('/admin/menu/categories', '📂', 'Danh Mục')}
+          {renderNavLink('/admin/menu/modifiers', '✨', 'Tùy Chọn')}
           
           <div style={{margin: '10px 20px', borderTop: '1px solid rgba(255,255,255,0.1)'}}></div>
 
-          {renderNavLink('/admin/tables', '🪑', 'Tables')}
+          {renderNavLink('/admin/tables', '🪑', 'Quản Lý Bàn')}
           
-          {renderNavLink('/admin/reports', '📈', 'Reports')}
-          {renderNavLink('/admin/kds', '📺', 'Kitchen Display')}
+          {renderNavLink('/admin/reports', '📈', 'Báo Cáo')}
+          {renderNavLink('/admin/kds', '📺', 'Màn Hình Bếp')}
         </nav>
 
         <div style={{ margin: '15px 20px', borderTop: '1px solid rgba(255,255,255,0.1)' }}></div>
@@ -133,7 +133,7 @@ export default function AdminLayout({ children }) {
               alignItems: 'center', width: '100%', padding: '10px 20px' 
             }}
           >
-            🚪 Logout
+            🚪 Đăng Xuất
           </button>
         </div>
       </div>
