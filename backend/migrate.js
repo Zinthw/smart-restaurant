@@ -19,7 +19,7 @@ async function migrate() {
     await pool.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
 
     // Xóa bảng cũ để tạo bảng mới.
-    // await pool.query(`DROP TABLE IF EXISTS menu_item_photos CASCADE;`);
+    // await pool.query(`DROP TABLE IF EXISTS users CASCADE;`);
     // await pool.query(`DROP TABLE IF EXISTS menu_item_modifier_groups CASCADE;`);
     // await pool.query(`DROP TABLE IF EXISTS modifier_options CASCADE;`);
     // await pool.query(`DROP TABLE IF EXISTS modifier_groups CASCADE;`);
@@ -49,9 +49,11 @@ async function migrate() {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         email VARCHAR(120) NOT NULL UNIQUE,
         password_hash VARCHAR(255) NOT NULL,
-        role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'staff', 'waiter', 'kitchen')),
+        role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'staff', 'waiter', 'kitchen', 'guest')),
         status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reset_password_token VARCHAR(255),
+        reset_password_expires TIMESTAMP
       );
     `);
     console.log('✅ Table "users" ready');
@@ -157,6 +159,42 @@ async function migrate() {
       );
     `);
     console.log('✅ Table "menu_item_modifier_groups" ready');
+
+    // Bảng ORDERS (Đơn hàng tổng)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        table_id UUID REFERENCES tables(id),
+        customer_name VARCHAR(100), -- Tên khách (Optional)
+        customer_phone VARCHAR(20), -- SĐT (Optional)
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'preparing', 'ready', 'served', 'paid', 'cancelled')),
+        total_amount DECIMAL(12, 2) DEFAULT 0,
+        notes TEXT, -- Ghi chú chung cho cả đơn
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        paid_at TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_orders_table ON orders(table_id);
+      CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+    `);
+    console.log('✅ Table "orders" ready');
+
+    // Bảng ORDER ITEMS (Chi tiết món ăn)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS order_items (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+        menu_item_id UUID REFERENCES menu_items(id),
+        quantity INT NOT NULL CHECK (quantity > 0),
+        price_per_unit DECIMAL(12, 2) NOT NULL, -- Giá gốc tại thời điểm đặt
+        total_price DECIMAL(12, 2) NOT NULL,    -- (Giá gốc + Giá modifiers) * Số lượng
+        modifiers_selected JSONB DEFAULT '[]',  -- Lưu array các modifier đã chọn
+        notes TEXT, -- Ghi chú riêng cho món (vd: không hành)
+        status VARCHAR(20) DEFAULT 'pending',   -- Trạng thái riêng của món (cho KDS sau này)
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Table "order_items" ready');
 
     // Tạo User Admin mẫu (Seeding nếu chạy lần đầu)
     // const adminEmail = 'admin@restaurant.com';

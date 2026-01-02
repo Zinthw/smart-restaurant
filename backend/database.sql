@@ -22,9 +22,11 @@ CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         email VARCHAR(120) NOT NULL UNIQUE,
         password_hash VARCHAR(255) NOT NULL,
-        role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'staff', 'waiter', 'kitchen')),
+        role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'staff', 'waiter', 'kitchen', 'guest')),
         status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reset_password_token VARCHAR(255),
+        reset_password_expires TIMESTAMP
       );
 
 CREATE TABLE IF NOT EXISTS menu_categories (
@@ -89,6 +91,34 @@ CREATE TABLE IF NOT EXISTS menu_item_modifier_groups (
         modifier_group_id UUID REFERENCES modifier_groups(id) ON DELETE CASCADE,
         sort_order INT DEFAULT 0,
         PRIMARY KEY (menu_item_id, modifier_group_id)
+      );
+
+CREATE TABLE IF NOT EXISTS orders (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        table_id UUID REFERENCES tables(id),
+        customer_name VARCHAR(100), -- Tên khách (Optional)
+        customer_phone VARCHAR(20), -- SĐT (Optional)
+        status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'preparing', 'ready', 'served', 'paid', 'cancelled')),
+        total_amount DECIMAL(12, 2) DEFAULT 0,
+        notes TEXT, -- Ghi chú chung cho cả đơn
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        paid_at TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_orders_table ON orders(table_id);
+      CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+
+CREATE TABLE IF NOT EXISTS order_items (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
+        menu_item_id UUID REFERENCES menu_items(id),
+        quantity INT NOT NULL CHECK (quantity > 0),
+        price_per_unit DECIMAL(12, 2) NOT NULL, -- Giá gốc tại thời điểm đặt
+        total_price DECIMAL(12, 2) NOT NULL,    -- (Giá gốc + Giá modifiers) * Số lượng
+        modifiers_selected JSONB DEFAULT '[]',  -- Lưu array các modifier đã chọn
+        notes TEXT, -- Ghi chú riêng cho món (vd: không hành)
+        status VARCHAR(20) DEFAULT 'pending',   -- Trạng thái riêng của món (cho KDS sau này)
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
 -- Thêm user admin mặc định (password: admin123)

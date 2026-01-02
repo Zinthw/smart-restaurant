@@ -16,6 +16,9 @@ const path = require("path");
 const photosRouter = require("./routes/photos");
 const modifiersRouter = require("./routes/modifiers");
 
+const ordersRouter = require("./routes/orders");
+const waiterRouter = require("./routes/waiter");
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -58,11 +61,17 @@ app.use(
   itemsRouter
 );
 
+// API Waiter
+app.use("/api/waiter", requireAuth, requireRole(["waiter", "admin"]), waiterRouter);
+
 // Router Modifiers
 app.use("/api/admin/menu", requireAuth, requireRole("admin"), modifiersRouter);
 
 // Public Routes (Dành cho khách quét QR)
 app.use("/api/menu", publicRouter);
+
+// API Order (Public cho Guest gọi món)
+app.use("/api/orders", ordersRouter);
 
 app.use(errorHandler);
 
