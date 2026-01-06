@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./index.css";
-import "./assets/style.css";
+import "./assets/admin.css";
 
 // Import debug helper (dev only)
 import "./utils/authDebugHelper.js";

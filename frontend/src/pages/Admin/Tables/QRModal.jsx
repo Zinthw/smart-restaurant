@@ -8,6 +8,17 @@ export default function QRModal({ open, onClose, table, qrUrl, onRefresh }) {
   const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
   const token = localStorage.getItem("admin_token");
 
+  // Hàm dịch location sang tiếng Việt
+  const translateLocation = (location) => {
+    const locationMap = {
+      'Indoor': 'Trong Nhà',
+      'Outdoor': 'Ngoài Trời',
+      'VIP Room': 'Phòng VIP',
+      'VIP': 'Phòng VIP'
+    };
+    return locationMap[location] || location;
+  };
+
   // Hàm xử lý khi bấm nút Regenerate
   const handleRegenerate = async () => {
     // 1. Hỏi xác nhận
@@ -42,7 +53,7 @@ export default function QRModal({ open, onClose, table, qrUrl, onRefresh }) {
       >
         {/* --- HEADER MODAL: CHỨA NÚT REGENERATE --- */}
         <div className="table-header">
-          <h3>QR Code Preview - {table?.table_number}</h3>
+          <h3>Xem Trước Mã QR - {table?.table_number}</h3>
 
           <div style={{ display: "flex", gap: "10px" }}>
             {/* Nút Regenerate mới thêm vào */}
@@ -57,7 +68,7 @@ export default function QRModal({ open, onClose, table, qrUrl, onRefresh }) {
               }}
               title="Tạo mã mới và hủy mã cũ"
             >
-              🔄 Regenerate
+              🔄 Tạo Lại
             </button>
 
             {/* Nút Close */}
@@ -66,7 +77,7 @@ export default function QRModal({ open, onClose, table, qrUrl, onRefresh }) {
               className="btn-secondary"
               style={{ width: "80px", minWidth: "unset" }}
             >
-              Close
+              Đóng
             </button>
           </div>
         </div>
@@ -97,19 +108,19 @@ export default function QRModal({ open, onClose, table, qrUrl, onRefresh }) {
 
           {/* Cột phải: Thông tin & Download */}
           <div className="qr-details" style={{ flex: 1.5 }}>
-            <h4 style={{ marginTop: 0 }}>Table Information</h4>
+            <h4 style={{ marginTop: 0 }}>Thông Tin Bàn</h4>
             <div className="detail-row">
-              <span className="detail-label">Location:</span>
-              <span className="detail-value">{table?.location}</span>
+              <span className="detail-label">Vị Trí:</span>
+              <span className="detail-value">{translateLocation(table?.location)}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">Capacity:</span>
-              <span className="detail-value">{table?.capacity} Persons</span>
+              <span className="detail-label">Sức Chứa:</span>
+              <span className="detail-value">{table?.capacity} Người</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">Status:</span>
+              <span className="detail-label">Trạng Thái:</span>
               <span className="detail-value" style={{ color: "green" }}>
-                Active
+                Hoạt Động
               </span>
             </div>
 
@@ -127,7 +138,7 @@ export default function QRModal({ open, onClose, table, qrUrl, onRefresh }) {
                 className="btn-primary"
                 style={{ textAlign: "center", textDecoration: "none" }}
               >
-                ⬇️ Download PNG Image
+                ⬇️ Tải Hình PNG
               </a>
               <a
                 href={`${apiUrl}/admin/tables/${table.id}/qr/download?format=pdf&token=${token}`}
@@ -135,7 +146,7 @@ export default function QRModal({ open, onClose, table, qrUrl, onRefresh }) {
                 className="btn-secondary"
                 style={{ textAlign: "center", textDecoration: "none" }}
               >
-                📄 Download PDF Print
+                📄 Tải File PDF In
               </a>
             </div>
           </div>

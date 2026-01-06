@@ -14,16 +14,52 @@ export default function TableFormModal({
     formState: { errors },
   } = useForm();
 
+  // Map location tiếng Việt sang tiếng Anh (cho backend)
+  const locationToEnglish = (vnLocation) => {
+    const map = {
+      'Trong Nhà': 'Indoor',
+      'Ngoài Trời': 'Outdoor',
+      'Phòng VIP': 'VIP Room'
+    };
+    return map[vnLocation] || vnLocation;
+  };
+
+  // Map location tiếng Anh sang tiếng Việt (cho hiển thị)
+  const locationToVietnamese = (enLocation) => {
+    const map = {
+      'Indoor': 'Trong Nhà',
+      'Outdoor': 'Ngoài Trời',
+      'VIP Room': 'Phòng VIP',
+      'VIP': 'Phòng VIP'
+    };
+    return map[enLocation] || enLocation;
+  };
+
   useEffect(() => {
-    if (initialData) reset(initialData);
-    else
+    if (initialData) {
+      // Khi edit, chuyển location từ tiếng Anh sang tiếng Việt
+      reset({
+        ...initialData,
+        location: locationToVietnamese(initialData.location)
+      });
+    } else {
       reset({
         table_number: "",
         capacity: 2,
-        location: "Indoor",
+        location: "Trong Nhà",
         description: "",
       });
+    }
   }, [initialData, reset, open]);
+
+  // Wrapper để chuyển location sang tiếng Anh trước khi submit
+  const handleFormSubmit = (data) => {
+    const submittedData = {
+      ...data,
+      location: locationToEnglish(data.location)
+    };
+    onSubmit(submittedData);
+  };
 
   if (!open) return null;
 
@@ -39,7 +75,7 @@ export default function TableFormModal({
           }}
         >
           <h3 style={{ margin: 0 }}>
-            {initialData ? "Edit Table" : "Add New Table"}
+            {initialData ? "Chỉnh Sửa Bàn" : "Thêm Bàn Mới"}
           </h3>
           <button
             onClick={onClose}
@@ -54,22 +90,22 @@ export default function TableFormModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} style={{ padding: "20px" }}>
+        <form onSubmit={handleSubmit(handleFormSubmit)} style={{ padding: "20px" }}>
           <div className="form-group">
-            <label className="form-label">Table Number</label>
+            <label className="form-label">Số Bàn</label>
             <input
               className="form-input"
-              placeholder="e.g. T-01"
+              placeholder="Ví dụ: B-01"
               {...register("table_number", { required: true })}
             />
             {errors.table_number && (
-              <span className="form-hint error">Required</span>
+              <span className="form-hint error">Bắt buộc</span>
             )}
           </div>
 
           <div style={{ display: "flex", gap: "15px" }}>
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Capacity</label>
+              <label className="form-label">Sức Chứa</label>
               <input
                 type="number"
                 className="form-input"
@@ -77,17 +113,17 @@ export default function TableFormModal({
               />
             </div>
             <div className="form-group" style={{ flex: 1 }}>
-              <label className="form-label">Location</label>
+              <label className="form-label">Vị Trí</label>
               <select className="form-input" {...register("location")}>
-                <option>Indoor</option>
-                <option>Outdoor</option>
-                <option>VIP</option>
+                <option>Trong Nhà</option>
+                <option>Ngoài Trời</option>
+                <option>Phòng VIP</option>
               </select>
             </div>
           </div>
 
           <div className="form-group">
-            <label className="form-label">Description</label>
+            <label className="form-label">Mô Tả</label>
             <textarea
               className="form-input"
               rows="3"
@@ -97,7 +133,7 @@ export default function TableFormModal({
 
           <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
             <button type="submit" className="btn-primary" style={{ flex: 1 }}>
-              Save Table
+              Lưu Bàn
             </button>
             <button
               type="button"
@@ -105,7 +141,7 @@ export default function TableFormModal({
               onClick={onClose}
               style={{ flex: 1 }}
             >
-              Cancel
+              Hủy
             </button>
           </div>
         </form>
