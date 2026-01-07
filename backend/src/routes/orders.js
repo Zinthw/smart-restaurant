@@ -213,4 +213,50 @@ router.get('/table/:tableId/order', async (req, res, next) => {
     } catch (err) { next(err); }
 });
 
+// URL: PATCH /api/orders/:id/attach-customer
+// Gắn customer vào order để tích điểm (Customer đã login)
+router.patch('/:id/attach-customer', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        
+        // Kiểm tra customer đã login chưa (từ header Authorization)
+        if (!req.customer || !req.customer.customerId) {
+            return res.status(401).json({ message: 'Customer login required' });
+        }
+
+        const customerId = req.customer.customerId;
+
+        // Kiểm tra order tồn tại và chưa thanh toán
+        const orderCheck = await db.query(
+            "SELECT * FROM orders WHERE id = $1 AND status NOT IN ('paid', 'cancelled')",
+            [id]
+        );
+        
+        if (orderCheck.rowCount === 0) {
+            return res.status(404).json({ message: 'Order not found or already completed' });
+        }
+
+        const order = orderCheck.rows[0];
+
+        // Nếu order đã có customer khác thì không cho gắn
+        if (order.customer_id && order.customer_id !== customerId) {
+            return res.status(400).json({ message: 'Order already assigned to another customer' });
+        }
+
+        // Gắn customer vào order
+        const { rows } = await db.query(
+            `UPDATE orders 
+             SET customer_id = $1, updated_at = NOW()
+             WHERE id = $2
+             RETURNING *`,
+            [customerId, id]
+        );
+
+        res.json({ 
+            message: 'Customer attached to order successfully',
+            order: rows[0]
+        });
+    } catch (err) { next(err); }
+});
+
 module.exports = router;

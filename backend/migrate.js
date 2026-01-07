@@ -27,7 +27,7 @@ async function migrate() {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         email VARCHAR(120) NOT NULL UNIQUE,
         password_hash VARCHAR(255) NOT NULL,
-        role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'staff', 'waiter', 'kitchen', 'guest')),
+        role VARCHAR(20) NOT NULL CHECK (role IN ('super_admin', 'admin', 'staff', 'waiter', 'kitchen')),
         status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
         reset_password_token VARCHAR(255),
         reset_password_expires TIMESTAMP,
@@ -35,6 +35,23 @@ async function migrate() {
       );
     `);
     console.log('Table "users" ready');
+
+    // Customers (khách quen có tài khoản)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS customers (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        full_name VARCHAR(100),
+        phone VARCHAR(20) UNIQUE,
+        email VARCHAR(120) UNIQUE,
+        password_hash VARCHAR(255) NOT NULL,
+        type VARCHAR(20) DEFAULT 'member' CHECK (type IN ('walk_in', 'member')),
+        total_points INT DEFAULT 0,
+        tier VARCHAR(20) DEFAULT 'bronze' CHECK (tier IN ('bronze', 'silver', 'gold', 'platinum')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('Table "customers" ready');
     
     // Tables
     await pool.query(`
@@ -140,10 +157,12 @@ async function migrate() {
       CREATE TABLE IF NOT EXISTS orders (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         table_id UUID REFERENCES tables(id),
+        customer_id UUID REFERENCES customers(id),
         customer_name VARCHAR(100), 
         customer_phone VARCHAR(20), 
         status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'preparing', 'ready', 'served', 'paid', 'cancelled')),
         total_amount DECIMAL(12, 2) DEFAULT 0,
+        points_earned INT DEFAULT 0,
         notes TEXT, 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -164,8 +183,18 @@ async function migrate() {
         status VARCHAR(20) DEFAULT 'pending',  
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS item_reviews (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        menu_item_id UUID REFERENCES menu_items(id) ON DELETE CASCADE,
+        customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
+        rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+        comment TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_reviews_item ON item_reviews(menu_item_id);
     `);
-    console.log('Orders ready');
+    console.log('Orders & Reviews ready');
 
     console.log('✅ ====TABLES CREATED.====');
 
@@ -176,11 +205,21 @@ async function migrate() {
     const passwordHash = await bcrypt.hash('123456', 10);
     await client.query(`
       INSERT INTO users (email, password_hash, role) VALUES 
+      ('superadmin@restaurant.com', $1, 'super_admin'),
       ('admin@restaurant.com', $1, 'admin'),
       ('waiter@restaurant.com', $1, 'waiter'),
-      ('kitchen@restaurant.com', $1, 'kitchen')
+      ('kitchen@restaurant.com', $1, 'kitchen'),
+      ('staff@restaurant.com', $1, 'staff')
     `, [passwordHash]);
-    console.log('🌱 Seeded 3 Staff Users (Pass: 123456)');
+    console.log('🌱 Seeded 5 Staff Users (Pass: 123456)');
+
+    // 3.1b Customers (khách quen)
+    await client.query(`
+      INSERT INTO customers (full_name, phone, email, password_hash, type, total_points, tier) VALUES 
+      ('Nguyen Van A', '0909111111', 'customer1@example.com', $1, 'member', 150, 'silver'),
+      ('Tran Thi B', '0909222222', 'customer2@example.com', $1, 'member', 50, 'bronze')
+    `, [passwordHash]);
+    console.log('🌱 Seeded 2 Customer Members (Pass: 123456)');
 
     // 3.2 Tables (15 bàn cho quán lớn)
     const tablesData = [];

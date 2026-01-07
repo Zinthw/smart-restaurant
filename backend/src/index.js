@@ -10,7 +10,7 @@ const qrRouter = require("./routes/qr");
 const publicRouter = require("./routes/public");
 const errorHandler = require("./middleware/errorHandler");
 const authRouter = require("./routes/auth");
-const { requireAuth, requireRole } = require("./middleware/authMiddleware");
+const { requireAuth, requireRole, requireCustomer, optionalCustomer } = require("./middleware/authMiddleware");
 const categoriesRouter = require("./routes/categories");
 const itemsRouter = require("./routes/items");
 const path = require("path");
@@ -22,6 +22,12 @@ const waiterRouter = require("./routes/waiter");
 const kitchenRouter = require("./routes/kitchen");
 const paymentRouter = require("./routes/payment");
 const reportsRouter = require("./routes/reports");
+
+// New routes
+const customerAuthRouter = require("./routes/customerAuth");
+const customerRouter = require("./routes/customer");
+const reviewsRouter = require("./routes/reviews");
+const superadminRouter = require("./routes/superadmin");
 
 const app = express();
 const server = http.createServer(app);
@@ -55,9 +61,19 @@ app.use("/api/kitchen", requireAuth, requireRole(["kitchen", "admin"]), kitchenR
 app.use("/api/admin/reports", requireAuth, requireRole("admin"), reportsRouter); 
 
 // Public Routes
-app.use("/api/menu", publicRouter);
-app.use("/api/orders", ordersRouter);
-app.use("/api/payment", paymentRouter); 
+app.use("/api/menu", optionalCustomer, publicRouter);
+app.use("/api/menu", optionalCustomer, reviewsRouter); // Reviews (GET public, POST requires customer)
+app.use("/api/orders", optionalCustomer, ordersRouter); // Attach customer if logged in
+app.use("/api/payment", optionalCustomer, paymentRouter);
+
+// Customer Auth Routes (public)
+app.use("/api/auth/customer", customerAuthRouter);
+
+// Customer Profile Routes (requires customer login)
+app.use("/api/customer", requireCustomer, customerRouter);
+
+// Super Admin Routes
+app.use("/api/superadmin", requireAuth, requireRole("super_admin"), superadminRouter); 
 
 app.use(errorHandler);
 

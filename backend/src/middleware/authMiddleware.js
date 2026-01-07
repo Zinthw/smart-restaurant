@@ -40,4 +40,43 @@ const requireRole = (role) => {
   };
 };
 
-module.exports = { requireAuth, requireRole };
+// Middleware cho Customer (yêu cầu đăng nhập)
+const requireCustomer = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: 'Customer authentication required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    if (decoded.type !== 'customer') {
+      return res.status(403).json({ message: 'Customer access only' });
+    }
+    req.customer = decoded; // { customerId, type: 'customer' }
+    next();
+  } catch (err) {
+    return res.status(403).json({ message: 'Invalid or expired token' });
+  }
+};
+
+// Middleware optional - không bắt buộc login nhưng nếu có token thì attach customer
+const optionalCustomer = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+      if (decoded.type === 'customer') {
+        req.customer = decoded;
+      }
+    } catch (err) {
+      // Token không hợp lệ - bỏ qua, tiếp tục như guest
+    }
+  }
+  next();
+};
+
+module.exports = { requireAuth, requireRole, requireCustomer, optionalCustomer };
