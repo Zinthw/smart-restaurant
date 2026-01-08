@@ -71,7 +71,9 @@ export default function GuestLoginPage() {
         </Link>
         <h1 className="text-lg font-bold text-card-foreground">Đăng nhập</h1>
         <span className="text-sm text-muted-foreground ml-auto">
-          <Link href="/" className="hover:underline">Chọn role khác</Link>
+          <Link href="/" className="hover:underline">
+            Chọn role khác
+          </Link>
         </span>
       </header>
 

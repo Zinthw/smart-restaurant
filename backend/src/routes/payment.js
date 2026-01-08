@@ -50,86 +50,29 @@ router.post('/orders/:id/pay', async (req, res, next) => {
         const { id } = req.params;
         const { method } = req.body; // 'cash', 'momo', 'zalopay', 'stripe'
 
-        // Lấy thông tin order
-        const orderRes = await client.query(
-            "SELECT * FROM orders WHERE id = $1 AND status != 'paid'",
+        // Update Order Status -> paid
+        const updateRes = await client.query(
+            "UPDATE orders SET status = 'paid', paid_at = NOW() WHERE id = $1 RETURNING *",
             [id]
         );
         
-        if (orderRes.rowCount === 0) {
+        if (updateRes.rowCount === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ message: 'Order not found or already paid' });
+            return res.status(404).json({ message: 'Order not found' });
         }
 
-        const order = orderRes.rows[0];
-
-        // Tính điểm thưởng: 1 điểm / 10.000 VND
-        const pointsEarned = Math.floor(parseFloat(order.total_amount) / 10000);
-
-        // Update Order Status -> paid
-        const updateRes = await client.query(
-            `UPDATE orders 
-             SET status = 'paid', paid_at = NOW(), points_earned = $1 
-             WHERE id = $2 
-             RETURNING *`,
-            [pointsEarned, id]
-        );
-        
-        const updatedOrder = updateRes.rows[0];
-        let customerInfo = null;
-
-        // Nếu order có customer_id thì cộng điểm và cập nhật tier
-        if (order.customer_id) {
-            // Cộng điểm vào customer
-            const customerRes = await client.query(
-                `UPDATE customers 
-                 SET total_points = total_points + $1, updated_at = NOW()
-                 WHERE id = $2
-                 RETURNING id, full_name, total_points, tier`,
-                [pointsEarned, order.customer_id]
-            );
-
-            if (customerRes.rowCount > 0) {
-                const customer = customerRes.rows[0];
-                
-                // Cập nhật tier dựa trên tổng điểm
-                let newTier = 'bronze';
-                if (customer.total_points >= 1000) newTier = 'platinum';
-                else if (customer.total_points >= 500) newTier = 'gold';
-                else if (customer.total_points >= 200) newTier = 'silver';
-
-                if (newTier !== customer.tier) {
-                    await client.query(
-                        "UPDATE customers SET tier = $1 WHERE id = $2",
-                        [newTier, order.customer_id]
-                    );
-                    customer.tier = newTier;
-                }
-
-                customerInfo = {
-                    id: customer.id,
-                    name: customer.full_name,
-                    pointsEarned,
-                    totalPoints: customer.total_points,
-                    tier: customer.tier
-                };
-            }
-        }
+        const order = updateRes.rows[0];
 
         await client.query('COMMIT');
 
         // Socket: Báo cho mọi người biết bàn này đã xong
         try {
             const io = getIO();
-            io.to(`table:${order.table_id}`).emit('order:paid', updatedOrder);
-            io.to('role:waiter').emit('order:paid', updatedOrder);
+            io.to(`table:${order.table_id}`).emit('order:paid', order);
+            io.to('role:waiter').emit('order:paid', order);
         } catch (e) {}
 
-        res.json({ 
-            message: 'Payment successful', 
-            order: updatedOrder,
-            loyalty: customerInfo
-        });
+        res.json({ message: 'Payment successful', order });
     } catch (err) {
         await client.query('ROLLBACK');
         next(err);

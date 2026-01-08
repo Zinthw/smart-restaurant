@@ -1,130 +1,98 @@
-const express = require("express");
-const db = require("../db");
-
+const express = require('express');
+const db = require('../db');
+const { requireCustomer, optionalCustomer } = require('../middleware/authMiddleware');
 const router = express.Router();
 
-// GET /api/menu/:itemId/reviews
-router.get("/:itemId/reviews", async (req, res, next) => {
+// GET /api/menu/reviews/:itemId - Lấy reviews của 1 món (public)
+router.get('/reviews/:itemId', async (req, res, next) => {
   try {
     const { itemId } = req.params;
-    const { page = 1, limit = 10 } = req.query;
-    const offset = (page - 1) * limit;
-
-    // Lấy danh sách reviews
-    const { rows } = await db.query(
-      `SELECT r.*, c.full_name as customer_name
-       FROM item_reviews r
-       LEFT JOIN customers c ON r.customer_id = c.id
-       WHERE r.menu_item_id = $1
-       ORDER BY r.created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [itemId, limit, offset]
-    );
-
-    // Đếm tổng và tính trung bình
-    const statsRes = await db.query(
-      `SELECT COUNT(*) as total, COALESCE(AVG(rating), 0) as average_rating
-       FROM item_reviews WHERE menu_item_id = $1`,
-      [itemId]
-    );
-
-    const stats = statsRes.rows[0];
-
-    res.json({
-      reviews: rows,
-      stats: {
-        total: parseInt(stats.total),
-        averageRating: parseFloat(stats.average_rating).toFixed(1)
-      },
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit)
-      }
-    });
-  } catch (err) {
-    next(err);
-  }
+    const { rows } = await db.query(`
+      SELECT r.*, c.full_name as customer_name
+      FROM item_reviews r
+      LEFT JOIN customers c ON r.customer_id = c.id
+      WHERE r.menu_item_id = $1
+      ORDER BY r.created_at DESC
+    `, [itemId]);
+    res.json(rows);
+  } catch (err) { next(err); }
 });
 
-// POST /api/menu/:itemId/reviews (Requires customer auth)
-router.post("/:itemId/reviews", async (req, res, next) => {
+// GET /api/menu/reviews/stats/:itemId - Thống kê rating của món
+router.get('/reviews/stats/:itemId', async (req, res, next) => {
   try {
     const { itemId } = req.params;
-    const { rating, comment } = req.body;
-    
-    // Kiểm tra customer đã login chưa
-    if (!req.customer || !req.customer.customerId) {
-      return res.status(401).json({ message: "Please login to submit a review" });
-    }
-    
-    const customerId = req.customer.customerId;
+    const { rows } = await db.query(`
+      SELECT 
+        COUNT(*) as total_reviews,
+        ROUND(AVG(rating)::numeric, 1) as avg_rating,
+        COUNT(*) FILTER (WHERE rating = 5) as five_star,
+        COUNT(*) FILTER (WHERE rating = 4) as four_star,
+        COUNT(*) FILTER (WHERE rating = 3) as three_star,
+        COUNT(*) FILTER (WHERE rating = 2) as two_star,
+        COUNT(*) FILTER (WHERE rating = 1) as one_star
+      FROM item_reviews
+      WHERE menu_item_id = $1
+    `, [itemId]);
+    res.json(rows[0] || { total_reviews: 0, avg_rating: 0 });
+  } catch (err) { next(err); }
+});
 
-    // Validate rating
+// POST /api/menu/reviews - Tạo review mới (requires customer login)
+router.post('/reviews', requireCustomer, async (req, res, next) => {
+  try {
+    const { menu_item_id, rating, comment } = req.body;
+    const customer_id = req.customer.customerId;
+
     if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      return res.status(400).json({ message: 'Rating phải từ 1 đến 5' });
     }
 
-    // Kiểm tra item có tồn tại không
-    const itemCheck = await db.query(
-      "SELECT 1 FROM menu_items WHERE id = $1 AND deleted_at IS NULL",
-      [itemId]
-    );
-    if (itemCheck.rowCount === 0) {
-      return res.status(404).json({ message: "Menu item not found" });
+    if (!menu_item_id) {
+      return res.status(400).json({ message: 'menu_item_id là bắt buộc' });
     }
 
-    // Kiểm tra customer đã review item này chưa
+    // Kiểm tra xem customer đã review món này chưa
     const existingReview = await db.query(
-      "SELECT 1 FROM item_reviews WHERE menu_item_id = $1 AND customer_id = $2",
-      [itemId, customerId]
+      'SELECT id FROM item_reviews WHERE customer_id = $1 AND menu_item_id = $2',
+      [customer_id, menu_item_id]
     );
+
     if (existingReview.rowCount > 0) {
-      return res.status(400).json({ message: "You have already reviewed this item" });
+      // Update review cũ
+      const { rows } = await db.query(`
+        UPDATE item_reviews 
+        SET rating = $1, comment = $2, created_at = NOW()
+        WHERE customer_id = $3 AND menu_item_id = $4
+        RETURNING *
+      `, [rating, comment, customer_id, menu_item_id]);
+      return res.json({ message: 'Đã cập nhật đánh giá', review: rows[0] });
     }
 
-    // Tạo review
-    const { rows } = await db.query(
-      `INSERT INTO item_reviews (menu_item_id, customer_id, rating, comment)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [itemId, customerId, rating, comment || null]
-    );
+    // Tạo review mới
+    const { rows } = await db.query(`
+      INSERT INTO item_reviews (customer_id, menu_item_id, rating, comment)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `, [customer_id, menu_item_id, rating, comment]);
 
-    res.status(201).json({ 
-      message: "Review submitted successfully", 
-      review: rows[0] 
-    });
-  } catch (err) {
-    next(err);
-  }
+    res.status(201).json({ message: 'Đã thêm đánh giá', review: rows[0] });
+  } catch (err) { next(err); }
 });
 
-// DELETE /api/menu/:itemId/reviews/:reviewId (Customer can delete own review)
-router.delete("/:itemId/reviews/:reviewId", async (req, res, next) => {
+// GET /api/menu/my-reviews - Lấy reviews của customer hiện tại
+router.get('/my-reviews', requireCustomer, async (req, res, next) => {
   try {
-    const { itemId, reviewId } = req.params;
-    
-    if (!req.customer || !req.customer.customerId) {
-      return res.status(401).json({ message: "Please login" });
-    }
-
-    const customerId = req.customer.customerId;
-
-    const { rows } = await db.query(
-      `DELETE FROM item_reviews 
-       WHERE id = $1 AND menu_item_id = $2 AND customer_id = $3
-       RETURNING *`,
-      [reviewId, itemId, customerId]
-    );
-
-    if (!rows[0]) {
-      return res.status(404).json({ message: "Review not found or not yours" });
-    }
-
-    res.json({ message: "Review deleted successfully" });
-  } catch (err) {
-    next(err);
-  }
+    const customer_id = req.customer.customerId;
+    const { rows } = await db.query(`
+      SELECT r.*, m.name as item_name, m.price
+      FROM item_reviews r
+      JOIN menu_items m ON r.menu_item_id = m.id
+      WHERE r.customer_id = $1
+      ORDER BY r.created_at DESC
+    `, [customer_id]);
+    res.json(rows);
+  } catch (err) { next(err); }
 });
 
 module.exports = router;
