@@ -1,28 +1,52 @@
-"use client"
+"use client";
 
-import { Search, User } from "lucide-react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useState, useEffect } from "react";
+import { Search, User } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface MenuHeaderProps {
-  searchQuery: string
-  onSearchChange: (query: string) => void
-  tableId?: string
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  tableId?: string;
 }
 
-export function MenuHeader({ searchQuery, onSearchChange, tableId }: MenuHeaderProps) {
+export function MenuHeader({
+  searchQuery,
+  onSearchChange,
+  tableId,
+}: MenuHeaderProps) {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [customerName, setCustomerName] = useState("");
+
+  useEffect(() => {
+    const token = localStorage.getItem("customerToken");
+    const name = localStorage.getItem("customerName");
+    setIsLoggedIn(!!token);
+    setCustomerName(name || "");
+  }, []);
+
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="flex items-center justify-between px-4 py-3">
         <div>
-          <h1 className="text-lg font-bold text-card-foreground">Smart Restaurant</h1>
-          {tableId && <p className="text-xs text-muted-foreground">Bàn {tableId}</p>}
+          <h1 className="text-lg font-bold text-card-foreground">
+            Smart Restaurant
+          </h1>
+          {tableId && (
+            <p className="text-xs text-muted-foreground">Bàn {tableId}</p>
+          )}
         </div>
-        <Link href="/guest/login">
-          <Button variant="ghost" size="icon" className="rounded-full">
+        <Link href={isLoggedIn ? "/guest/profile" : "/guest/login"}>
+          <Button variant="ghost" size="icon" className="rounded-full relative">
             <User className="h-5 w-5" />
-            <span className="sr-only">Đăng nhập</span>
+            {isLoggedIn && (
+              <span className="absolute -bottom-1 -right-1 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-card" />
+            )}
+            <span className="sr-only">
+              {isLoggedIn ? "Hồ sơ" : "Đăng nhập"}
+            </span>
           </Button>
         </Link>
       </div>
@@ -39,5 +63,5 @@ export function MenuHeader({ searchQuery, onSearchChange, tableId }: MenuHeaderP
         </div>
       </div>
     </header>
-  )
+  );
 }

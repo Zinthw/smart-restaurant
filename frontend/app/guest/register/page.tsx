@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { customerAuthAPI } from "@/lib/api"
 
 export default function GuestRegisterPage() {
   const router = useRouter()
@@ -22,22 +23,35 @@ export default function GuestRegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [acceptTerms, setAcceptTerms] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!acceptTerms) return
 
     setIsLoading(true)
+    setError("")
 
-    // Simulate registration - in production this would call an API
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      // Call real API
+      await customerAuthAPI.register({
+        fullName: formData.fullName,
+        phone: formData.phone || undefined,
+        email: formData.email,
+        password: formData.password,
+      })
 
-    // Store customer token
-    localStorage.setItem("customerToken", "new-demo-token")
-    localStorage.setItem("customerName", formData.fullName)
-
-    setIsLoading(false)
-    router.push("/menu/guest")
+      setSuccess(true)
+      // Redirect to login after 2 seconds
+      setTimeout(() => {
+        router.push("/guest/login")
+      }, 2000)
+    } catch (err: any) {
+      setError(err.message || "Đăng ký thất bại. Vui lòng thử lại.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -60,6 +74,16 @@ export default function GuestRegisterPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="rounded-lg border border-green-500/50 bg-green-500/10 p-3 text-sm text-green-600">
+              Đăng ký thành công! Đang chuyển hướng đến trang đăng nhập...
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="fullName">Họ và tên</Label>
             <Input

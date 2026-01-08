@@ -2,49 +2,84 @@
 
 import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
-import { CheckCircle, Printer, Star, Home, Gift } from "lucide-react"
+import { CheckCircle, Printer, Star, Home, Gift, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatPrice } from "@/lib/menu-data"
+import { paymentAPI, orderAPI } from "@/lib/api"
+
+interface Receipt {
+  restaurant: string
+  address: string
+  orderId: string
+  date: string
+  items: Array<{
+    name: string
+    quantity: number
+    price: number
+  }>
+  total: number
+}
 
 interface Order {
   id: string
-  items: Array<{
-    menuItem: { name: string; price: number }
-    quantity: number
-    totalPrice: number
-  }>
-  tableId: string
+  table_id: string
   status: string
-  subtotal: number
-  createdAt: string
-  paidAt?: string
+  total_amount: number
+  created_at: string
 }
 
 export default function PaymentSuccessPage({ params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = use(params)
   const router = useRouter()
+  const [receipt, setReceipt] = useState<Receipt | null>(null)
   const [order, setOrder] = useState<Order | null>(null)
   const [loyaltyPoints, setLoyaltyPoints] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Get order from localStorage
-    const storedOrders = JSON.parse(localStorage.getItem("orders") || "[]")
-    const foundOrder = storedOrders.find((o: Order) => o.id === orderId)
-    setOrder(foundOrder || null)
+    const fetchData = async () => {
+      try {
+        // Get order details
+        const orderData = await orderAPI.getOrder(orderId)
+        setOrder(orderData as Order)
 
-    // Calculate loyalty points (1 point per 10,000 VND)
-    if (foundOrder) {
-      const points = Math.floor(foundOrder.subtotal / 10000)
-      setLoyaltyPoints(points)
+        // Try to get receipt (may fail if order wasn't paid yet)
+        try {
+          const receiptData = await paymentAPI.getReceipt(orderId)
+          setReceipt(receiptData)
+        } catch {
+          // Receipt not available, use order data instead
+        }
+
+        // Calculate loyalty points (1 point per 10,000 VND)
+        const points = Math.floor(orderData.total_amount / 10000)
+        setLoyaltyPoints(points)
+      } catch (error) {
+        console.error("Failed to fetch data:", error)
+      } finally {
+        setIsLoading(false)
+      }
     }
+
+    fetchData()
   }, [orderId])
 
   const handlePrint = () => {
     window.print()
   }
 
-  const tax = order ? order.subtotal * 0.1 : 0
-  const total = order ? order.subtotal + tax : 0
+  // Calculate tax and total from receipt or order
+  const subtotal = receipt?.total || order?.total_amount || 0
+  const tax = subtotal * 0.1
+  const total = subtotal + tax
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -69,16 +104,18 @@ export default function PaymentSuccessPage({ params }: { params: Promise<{ order
           <div className="border-b border-border p-4 print:border-dashed">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Mã đơn:</span>
-              <span className="font-mono font-medium text-card-foreground">#{order?.id.slice(-6)}</span>
+              <span className="font-mono font-medium text-card-foreground">
+                #{receipt?.orderId?.slice(-6) || order?.id.slice(-6)}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Bàn:</span>
-              <span className="font-medium text-card-foreground">{order?.tableId}</span>
+              <span className="font-medium text-card-foreground">{order?.table_id}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Thời gian:</span>
               <span className="font-medium text-card-foreground">
-                {order && new Date(order.paidAt || order.createdAt).toLocaleString("vi-VN")}
+                {receipt?.date || (order && new Date(order.created_at).toLocaleString("vi-VN"))}
               </span>
             </div>
           </div>
@@ -93,12 +130,12 @@ export default function PaymentSuccessPage({ params }: { params: Promise<{ order
                 </tr>
               </thead>
               <tbody>
-                {order?.items.map((item, index) => (
+                {receipt?.items.map((item: { name: string; quantity: number; price: number }, index: number) => (
                   <tr key={index}>
-                    <td className="py-1 text-card-foreground">{item.menuItem.name}</td>
+                    <td className="py-1 text-card-foreground">{item.name}</td>
                     <td className="py-1 text-center text-card-foreground">{item.quantity}</td>
                     <td className="py-1 text-right text-card-foreground">
-                      {formatPrice(item.totalPrice * item.quantity)}
+                      {formatPrice(item.price * item.quantity)}
                     </td>
                   </tr>
                 ))}
@@ -109,7 +146,7 @@ export default function PaymentSuccessPage({ params }: { params: Promise<{ order
           <div className="p-4">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Tạm tính</span>
-              <span className="text-card-foreground">{formatPrice(order?.subtotal || 0)}</span>
+              <span className="text-card-foreground">{formatPrice(subtotal)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">VAT (10%)</span>

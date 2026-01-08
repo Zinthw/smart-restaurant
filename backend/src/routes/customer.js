@@ -1,5 +1,6 @@
 const express = require("express");
 const db = require("../db");
+const bcrypt = require("bcrypt");
 
 const router = express.Router();
 
@@ -85,12 +86,12 @@ router.get("/orders", async (req, res, next) => {
     );
 
     res.json({
-      data: rows,
+      orders: rows,
       pagination: {
         total: parseInt(countRes.rows[0].count),
         page: parseInt(page),
-        limit: parseInt(limit)
-      }
+        limit: parseInt(limit),
+      },
     });
   } catch (err) {
     next(err);
@@ -121,7 +122,7 @@ router.get("/points", async (req, res, next) => {
       bronze: { next: "silver", threshold: 200 },
       silver: { next: "gold", threshold: 500 },
       gold: { next: "platinum", threshold: 1000 },
-      platinum: { next: null, threshold: null }
+      platinum: { next: null, threshold: null },
     };
 
     if (tierThresholds[tier].next) {
@@ -133,8 +134,61 @@ router.get("/points", async (req, res, next) => {
       totalPoints: points,
       currentTier: tier,
       nextTier,
-      pointsToNextTier: pointsToNext > 0 ? pointsToNext : 0
+      pointsToNextTier: pointsToNext > 0 ? pointsToNext : 0,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/customer/change-password
+router.put("/change-password", async (req, res, next) => {
+  try {
+    const customerId = req.customer.customerId;
+    const { currentPassword, newPassword } = req.body;
+
+    // Validate input
+    if (!currentPassword || !newPassword) {
+      return res
+        .status(400)
+        .json({ message: "Mật khẩu hiện tại và mật khẩu mới là bắt buộc" });
+    }
+
+    if (newPassword.length < 6) {
+      return res
+        .status(400)
+        .json({ message: "Mật khẩu mới phải có ít nhất 6 ký tự" });
+    }
+
+    // Get current password hash
+    const { rows } = await db.query(
+      "SELECT password_hash FROM customers WHERE id = $1",
+      [customerId]
+    );
+
+    if (!rows[0]) {
+      return res.status(404).json({ message: "Không tìm thấy tài khoản" });
+    }
+
+    // Verify current password
+    const isValidPassword = await bcrypt.compare(
+      currentPassword,
+      rows[0].password_hash
+    );
+    if (!isValidPassword) {
+      return res.status(401).json({ message: "Mật khẩu hiện tại không đúng" });
+    }
+
+    // Hash new password
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await db.query(
+      "UPDATE customers SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+      [newPasswordHash, customerId]
+    );
+
+    res.json({ message: "Đổi mật khẩu thành công" });
   } catch (err) {
     next(err);
   }

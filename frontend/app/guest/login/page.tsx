@@ -1,54 +1,78 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { ArrowLeft, Eye, EyeOff } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Checkbox } from "@/components/ui/checkbox"
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { customerAuthAPI } from "@/lib/api";
+import { useCart } from "@/lib/cart-context";
 
 export default function GuestLoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
+  const { dispatch } = useCart();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
 
-    // Simulate login - in production this would call an API
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      // Clear cart from previous session before logging in new user
+      dispatch({ type: "CLEAR_CART" });
 
-    // Store customer token
-    localStorage.setItem("customerToken", "demo-token")
-    localStorage.setItem("customerName", "Khách hàng")
+      // Call real API
+      const response = await customerAuthAPI.login(email, password);
 
-    setIsLoading(false)
-    router.push("/menu/guest")
-  }
+      // Store customer token and info
+      localStorage.setItem(
+        "customerToken",
+        response.token || response.accessToken
+      );
+      localStorage.setItem("customerName", response.customer.fullName);
+      localStorage.setItem("customerId", response.customer.id);
+      localStorage.setItem("customerInfo", JSON.stringify(response.customer));
+
+      router.push("/menu/guest");
+    } catch (err: any) {
+      setError(
+        err.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleGoogleLogin = () => {
     // In production, this would initiate OAuth flow
-    localStorage.setItem("customerToken", "google-demo-token")
-    localStorage.setItem("customerName", "Google User")
-    router.push("/menu/guest")
-  }
+    // For now, redirect to menu as guest
+    router.push("/menu/guest");
+  };
 
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 flex items-center gap-4 border-b border-border bg-card px-4 py-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-5 w-5" />
-          <span className="sr-only">Quay lại</span>
-        </Button>
+        <Link href="/" className="flex items-center gap-2">
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="h-5 w-5" />
+            <span className="sr-only">Quay lại</span>
+          </Button>
+        </Link>
         <h1 className="text-lg font-bold text-card-foreground">Đăng nhập</h1>
+        <span className="text-sm text-muted-foreground ml-auto">
+          <Link href="/" className="hover:underline">Chọn role khác</Link>
+        </span>
       </header>
 
       <main className="mx-auto max-w-md p-6">
@@ -56,11 +80,20 @@ export default function GuestLoginPage() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
             <span className="text-3xl">🍽️</span>
           </div>
-          <h2 className="text-2xl font-bold text-foreground">Chào mừng trở lại!</h2>
-          <p className="mt-2 text-muted-foreground">Đăng nhập để tích điểm và theo dõi đơn hàng</p>
+          <h2 className="text-2xl font-bold text-foreground">
+            Chào mừng trở lại!
+          </h2>
+          <p className="mt-2 text-muted-foreground">
+            Đăng nhập để tích điểm và theo dõi đơn hàng
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -89,7 +122,11 @@ export default function GuestLoginPage() {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
               </button>
             </div>
           </div>
@@ -105,12 +142,20 @@ export default function GuestLoginPage() {
                 Ghi nhớ đăng nhập
               </Label>
             </div>
-            <Link href="/guest/forgot-password" className="text-sm text-primary hover:underline">
+            <Link
+              href="/guest/forgot-password"
+              className="text-sm text-primary hover:underline"
+            >
               Quên mật khẩu?
             </Link>
           </div>
 
-          <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+          <Button
+            type="submit"
+            className="w-full"
+            size="lg"
+            disabled={isLoading}
+          >
             {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
           </Button>
         </form>
@@ -120,11 +165,19 @@ export default function GuestLoginPage() {
             <div className="w-full border-t border-border" />
           </div>
           <div className="relative flex justify-center">
-            <span className="bg-background px-4 text-sm text-muted-foreground">hoặc</span>
+            <span className="bg-background px-4 text-sm text-muted-foreground">
+              hoặc
+            </span>
           </div>
         </div>
 
-        <Button type="button" variant="outline" className="w-full bg-transparent" size="lg" onClick={handleGoogleLogin}>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full bg-transparent"
+          size="lg"
+          onClick={handleGoogleLogin}
+        >
           <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
             <path
               fill="currentColor"
@@ -148,11 +201,14 @@ export default function GuestLoginPage() {
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Chưa có tài khoản?{" "}
-          <Link href="/guest/register" className="font-medium text-primary hover:underline">
+          <Link
+            href="/guest/register"
+            className="font-medium text-primary hover:underline"
+          >
             Đăng ký ngay
           </Link>
         </p>
       </main>
     </div>
-  )
+  );
 }

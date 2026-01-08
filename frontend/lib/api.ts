@@ -4,6 +4,23 @@
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
 
+// Backend base URL (without /api) for static files like images
+export const BACKEND_URL = API_BASE_URL.replace("/api", "");
+
+// Helper function to get full image URL
+export function getImageUrl(path: string | null | undefined): string {
+  if (!path) return "/placeholder.svg";
+  // If already a full URL, return as-is
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+  // If relative path (like /uploads/xxx), prepend backend URL
+  if (path.startsWith("/")) {
+    return `${BACKEND_URL}${path}`;
+  }
+  return path;
+}
+
 // Generic fetch wrapper with error handling
 async function fetchAPI<T>(
   endpoint: string,
@@ -15,11 +32,13 @@ async function fetchAPI<T>(
     "Content-Type": "application/json",
   };
 
-  // Add auth token if available
+  // Add auth token if available (check all token types)
   if (typeof window !== "undefined") {
     const adminToken = localStorage.getItem("admin_token");
     const customerToken = localStorage.getItem("customerToken");
-    const token = adminToken || customerToken;
+    const kitchenToken = localStorage.getItem("kitchenToken");
+    const waiterToken = localStorage.getItem("waiterToken");
+    const token = adminToken || kitchenToken || waiterToken || customerToken;
 
     if (token) {
       defaultHeaders["Authorization"] = `Bearer ${token}`;
@@ -80,53 +99,90 @@ export const authAPI = {
 // ==================== CUSTOMER AUTH API ====================
 
 export const customerAuthAPI = {
-  // Customer login with phone
-  login: (phone: string, password: string) =>
-    fetchAPI<{ token: string; customer: any }>("/customer-auth/login", {
-      method: "POST",
-      body: JSON.stringify({ phone, password }),
-    }),
+  // Customer login with email or phone
+  login: (phoneOrEmail: string, password: string) =>
+    fetchAPI<{ token: string; accessToken: string; customer: any }>(
+      "/auth/customer/login",
+      {
+        method: "POST",
+        body: JSON.stringify({ phoneOrEmail, password }),
+      }
+    ),
 
   // Customer register
-  register: (data: { phone: string; password: string; name: string }) =>
-    fetchAPI<{ token: string; customer: any }>("/customer-auth/register", {
+  register: (data: {
+    fullName: string;
+    phone?: string;
+    email: string;
+    password: string;
+  }) =>
+    fetchAPI<{ message: string; customer: any }>("/auth/customer/register", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
   // Send OTP for verification
   sendOTP: (phone: string) =>
-    fetchAPI("/customer-auth/send-otp", {
+    fetchAPI("/auth/customer/send-otp", {
       method: "POST",
       body: JSON.stringify({ phone }),
     }),
 
   // Verify OTP
   verifyOTP: (phone: string, otp: string) =>
-    fetchAPI("/customer-auth/verify-otp", {
+    fetchAPI("/auth/customer/verify-otp", {
       method: "POST",
       body: JSON.stringify({ phone, otp }),
     }),
+};
+
+// ==================== CUSTOMER API (for logged-in customers) ====================
+
+export const customerAPI = {
+  // Get customer profile
+  getProfile: () => fetchAPI<any>("/customer/profile"),
+
+  // Update profile
+  updateProfile: (data: { fullName?: string; phone?: string }) =>
+    fetchAPI<{ message: string; customer: any }>("/customer/profile", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  // Get loyalty points
+  getPoints: () =>
+    fetchAPI<{
+      totalPoints: number;
+      currentTier: string;
+      nextTier: string | null;
+      pointsToNextTier: number;
+    }>("/customer/points"),
+
+  // Get customer orders history
+  getOrders: (page: number = 1, limit: number = 10) =>
+    fetchAPI<{ orders: any[]; pagination: any }>(
+      `/customer/orders?page=${page}&limit=${limit}`
+    ),
 };
 
 // ==================== MENU API ====================
 
 export const menuAPI = {
   // Get all categories
-  getCategories: () => fetchAPI<{ data: any[] }>("/public/categories"),
+  getCategories: () => fetchAPI<{ data: any[] }>("/menu/categories"),
 
   // Get all menu items
   getItems: (categoryId?: string) => {
     const query = categoryId ? `?category=${categoryId}` : "";
-    return fetchAPI<{ data: any[] }>(`/public/items${query}`);
+    return fetchAPI<{ data: any[] }>(`/menu/items${query}`);
   },
 
   // Get single item detail
-  getItem: (id: string) => fetchAPI<{ data: any }>(`/public/items/${id}`),
+  getItem: (id: string) => fetchAPI<{ data: any }>(`/menu/items/${id}`),
 
   // Get item modifiers
   getItemModifiers: (itemId: string) =>
-    fetchAPI<{ data: any[] }>(`/public/items/${itemId}/modifiers`),
+    fetchAPI<{ data: any[] }>(`/menu/items/${itemId}/modifiers`),
 };
 
 // ==================== ORDER API ====================
@@ -439,7 +495,7 @@ export const adminAPI = {
       }),
     // Modifiers for item
     getModifiers: (itemId: string) =>
-      fetchAPI<any[]>(`/admin/menu/items/${itemId}/modifiers`),
+      fetchAPI<string[]>(`/admin/menu/items/${itemId}/modifier-groups`),
     setModifiers: (itemId: string, groupIds: string[]) =>
       fetchAPI(`/admin/menu/items/${itemId}/modifier-groups`, {
         method: "POST",
@@ -553,6 +609,7 @@ export const reviewsAPI = {
 export default {
   auth: authAPI,
   customerAuth: customerAuthAPI,
+  customer: customerAPI,
   menu: menuAPI,
   order: orderAPI,
   kitchen: kitchenAPI,

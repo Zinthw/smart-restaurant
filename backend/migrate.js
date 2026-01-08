@@ -5,7 +5,10 @@ const bcrypt = require("bcrypt");
 // Kết nối Database
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  ssl:
+    process.env.NODE_ENV === "production"
+      ? { rejectUnauthorized: false }
+      : false,
 });
 
 async function migrate() {
@@ -16,7 +19,9 @@ async function migrate() {
     await client.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
 
     // --- 1. CLEANUP (Nếu cần reset sạch sẽ thì bỏ comment dòng dưới) ---
-    await client.query(`DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres;`);
+    await client.query(
+      `DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres;`
+    );
     console.log("✅ Reset Database");
 
     // --- 2. CREATE TABLES ---
@@ -47,12 +52,14 @@ async function migrate() {
         type VARCHAR(20) DEFAULT 'member' CHECK (type IN ('walk_in', 'member')),
         total_points INT DEFAULT 0,
         tier VARCHAR(20) DEFAULT 'bronze' CHECK (tier IN ('bronze', 'silver', 'gold', 'platinum')),
+        reset_password_token VARCHAR(255),
+        reset_password_expires TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log('Table "customers" ready');
-    
+
     // Tables
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tables (
@@ -119,7 +126,7 @@ async function migrate() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('Menu system ready');
+    console.log("Menu system ready");
 
     // Modifiers
     await pool.query(`
@@ -150,7 +157,7 @@ async function migrate() {
         PRIMARY KEY (menu_item_id, modifier_group_id)
       );
     `);
-    console.log('Modifiers ready');
+    console.log("Modifiers ready");
 
     // Orders
     await pool.query(`
@@ -194,43 +201,50 @@ async function migrate() {
       );
       CREATE INDEX IF NOT EXISTS idx_reviews_item ON item_reviews(menu_item_id);
     `);
-    console.log('Orders & Reviews ready');
+    console.log("Orders & Reviews ready");
 
-    console.log('✅ ====TABLES CREATED.====');
-
+    console.log("✅ ====TABLES CREATED.====");
 
     // --- 3. SEED DATA ---
 
     // 3.1 Users
-    const passwordHash = await bcrypt.hash('123456', 10);
-    await client.query(`
+    const passwordHash = await bcrypt.hash("123456", 10);
+    await client.query(
+      `
       INSERT INTO users (email, password_hash, role) VALUES 
       ('superadmin@restaurant.com', $1, 'super_admin'),
       ('admin@restaurant.com', $1, 'admin'),
       ('waiter@restaurant.com', $1, 'waiter'),
       ('kitchen@restaurant.com', $1, 'kitchen'),
       ('staff@restaurant.com', $1, 'staff')
-    `, [passwordHash]);
-    console.log('🌱 Seeded 5 Staff Users (Pass: 123456)');
+    `,
+      [passwordHash]
+    );
+    console.log("🌱 Seeded 5 Staff Users (Pass: 123456)");
 
     // 3.1b Customers (khách quen)
-    await client.query(`
+    await client.query(
+      `
       INSERT INTO customers (full_name, phone, email, password_hash, type, total_points, tier) VALUES 
       ('Nguyen Van A', '0909111111', 'customer1@example.com', $1, 'member', 150, 'silver'),
       ('Tran Thi B', '0909222222', 'customer2@example.com', $1, 'member', 50, 'bronze')
-    `, [passwordHash]);
-    console.log('🌱 Seeded 2 Customer Members (Pass: 123456)');
+    `,
+      [passwordHash]
+    );
+    console.log("🌱 Seeded 2 Customer Members (Pass: 123456)");
 
     // 3.2 Tables (15 bàn cho quán lớn)
     const tablesData = [];
-    for(let i=1; i<=5; i++) tablesData.push(`('T-0${i}', 2, 'Indoor')`);
-    for(let i=6; i<=10; i++) tablesData.push(`('T-${i<10?'0'+i:i}', 4, 'Window')`);
-    for(let i=1; i<=3; i++) tablesData.push(`('VIP-${i}', 8, 'Private Room')`);
-    for(let i=1; i<=2; i++) tablesData.push(`('OUT-${i}', 4, 'Garden')`);
-    
+    for (let i = 1; i <= 5; i++) tablesData.push(`('T-0${i}', 2, 'Indoor')`);
+    for (let i = 6; i <= 10; i++)
+      tablesData.push(`('T-${i < 10 ? "0" + i : i}', 4, 'Window')`);
+    for (let i = 1; i <= 3; i++)
+      tablesData.push(`('VIP-${i}', 8, 'Private Room')`);
+    for (let i = 1; i <= 2; i++) tablesData.push(`('OUT-${i}', 4, 'Garden')`);
+
     const tablesRes = await client.query(`
       INSERT INTO tables (table_number, capacity, location) 
-      VALUES ${tablesData.join(',')}
+      VALUES ${tablesData.join(",")}
       RETURNING id, table_number
     `);
     const tables = tablesRes.rows;
@@ -253,15 +267,25 @@ async function migrate() {
     const modGroups = modGroupRes.rows;
 
     // Options
-    await client.query(`INSERT INTO modifier_options (group_id, name) VALUES 
-      ($1, 'Rare'), ($1, 'Medium'), ($1, 'Well Done')`, [modGroups[0].id]);
-    await client.query(`INSERT INTO modifier_options (group_id, name, price_adjustment) VALUES 
-      ($1, 'Phô mai', 10000), ($1, 'Trứng ốp', 5000)`, [modGroups[1].id]);
-    await client.query(`INSERT INTO modifier_options (group_id, name) VALUES 
-      ($1, '0%'), ($1, '50%'), ($1, '100%')`, [modGroups[2].id]);
-    
+    await client.query(
+      `INSERT INTO modifier_options (group_id, name) VALUES 
+      ($1, 'Rare'), ($1, 'Medium'), ($1, 'Well Done')`,
+      [modGroups[0].id]
+    );
+    await client.query(
+      `INSERT INTO modifier_options (group_id, name, price_adjustment) VALUES 
+      ($1, 'Phô mai', 10000), ($1, 'Trứng ốp', 5000)`,
+      [modGroups[1].id]
+    );
+    await client.query(
+      `INSERT INTO modifier_options (group_id, name) VALUES 
+      ($1, '0%'), ($1, '50%'), ($1, '100%')`,
+      [modGroups[2].id]
+    );
+
     // Items
-    const itemRes = await client.query(`
+    const itemRes = await client.query(
+      `
       INSERT INTO menu_items (category_id, name, price, description, is_chef_recommended, status) VALUES 
       ($1, 'Salad Caesar', 85000, 'Rau tươi, sốt đặc biệt', false, 'available'),
       ($1, 'Súp bí đỏ', 60000, 'Kem tươi, hạt bí', true, 'available'),
@@ -272,7 +296,9 @@ async function migrate() {
       ($4, 'Trà sữa trân châu', 55000, 'Đường đen', false, 'available'),
       ($4, 'Coca Cola', 20000, 'Lon 330ml', false, 'available')
       RETURNING id, name, price
-    `, [cats[0].id, cats[1].id, cats[2].id, cats[3].id]);
+    `,
+      [cats[0].id, cats[1].id, cats[2].id, cats[3].id]
+    );
     const items = itemRes.rows;
     console.log(`🌱 Seeded ${items.length} Menu Items`);
 
@@ -281,58 +307,94 @@ async function migrate() {
     console.log("⏳ Generating 50 past orders for reports...");
     const pastOrdersValues = [];
     const pastOrderItemsValues = [];
-    
-    for (let i = 0; i < 50; i++) {
-        // Random ngày trong 30 ngày qua
-        const daysAgo = Math.floor(Math.random() * 30);
-        const orderDate = new Date();
-        orderDate.setDate(orderDate.getDate() - daysAgo);
-        const dateStr = orderDate.toISOString();
 
-        // Random bàn và món
-        const table = tables[Math.floor(Math.random() * tables.length)];
-        const item1 = items[Math.floor(Math.random() * items.length)];
-        const item2 = items[Math.floor(Math.random() * items.length)];
-        
-        const total = parseFloat(item1.price) + parseFloat(item2.price);
-        
-        const res = await client.query(`
+    for (let i = 0; i < 50; i++) {
+      // Random ngày trong 30 ngày qua
+      const daysAgo = Math.floor(Math.random() * 30);
+      const orderDate = new Date();
+      orderDate.setDate(orderDate.getDate() - daysAgo);
+      const dateStr = orderDate.toISOString();
+
+      // Random bàn và món
+      const table = tables[Math.floor(Math.random() * tables.length)];
+      const item1 = items[Math.floor(Math.random() * items.length)];
+      const item2 = items[Math.floor(Math.random() * items.length)];
+
+      const total = parseFloat(item1.price) + parseFloat(item2.price);
+
+      const res = await client.query(
+        `
             INSERT INTO orders (table_id, customer_name, status, total_amount, paid_at, created_at)
             VALUES ($1, 'Guest Past', 'paid', $2, $3, $3) RETURNING id
-        `, [table.id, total, dateStr]);
-        const orderId = res.rows[0].id;
+        `,
+        [table.id, total, dateStr]
+      );
+      const orderId = res.rows[0].id;
 
-        await client.query(`
+      await client.query(
+        `
             INSERT INTO order_items (order_id, menu_item_id, quantity, price_per_unit, total_price, status, created_at)
             VALUES 
             ($1, $2, 1, $3, $3, 'paid', $5),
             ($1, $4, 1, $6, $6, 'paid', $5)
-        `, [orderId, item1.id, item1.price, item2.id, dateStr, item2.price]);
+        `,
+        [orderId, item1.id, item1.price, item2.id, dateStr, item2.price]
+      );
     }
     console.log("🌱 Seeded 50 Past Orders (Paid)");
 
     // 3.5 ACTIVE ORDERS SCENARIOS (Cho Waiter/KDS Testing)
     console.log("⏳ Generating Active Scenarios...");
-    
+
     // Case 1: Mới đặt (Pending) - Để Waiter Accept
-    const p1 = await client.query(`INSERT INTO orders (table_id, customer_name, status, total_amount) VALUES ($1, 'Mr. A (Mới đến)', 'pending', 250000) RETURNING id`, [tables[0].id]);
-    await client.query(`INSERT INTO order_items (order_id, menu_item_id, quantity, price_per_unit, total_price, status) VALUES ($1, $2, 1, 250000, 250000, 'pending')`, [p1.rows[0].id, items.find(i=>i.name.includes('Bò')).id]);
+    const p1 = await client.query(
+      `INSERT INTO orders (table_id, customer_name, status, total_amount) VALUES ($1, 'Mr. A (Mới đến)', 'pending', 250000) RETURNING id`,
+      [tables[0].id]
+    );
+    await client.query(
+      `INSERT INTO order_items (order_id, menu_item_id, quantity, price_per_unit, total_price, status) VALUES ($1, $2, 1, 250000, 250000, 'pending')`,
+      [p1.rows[0].id, items.find((i) => i.name.includes("Bò")).id]
+    );
 
     // Case 2: Đã nhận (Accepted) - Để KDS nấu
-    const p2 = await client.query(`INSERT INTO orders (table_id, customer_name, status, total_amount) VALUES ($1, 'Ms. B (Chờ nấu)', 'accepted', 120000) RETURNING id`, [tables[1].id]);
-    await client.query(`INSERT INTO order_items (order_id, menu_item_id, quantity, price_per_unit, total_price, status) VALUES ($1, $2, 1, 120000, 120000, 'pending')`, [p2.rows[0].id, items.find(i=>i.name.includes('Mỳ')).id]);
+    const p2 = await client.query(
+      `INSERT INTO orders (table_id, customer_name, status, total_amount) VALUES ($1, 'Ms. B (Chờ nấu)', 'accepted', 120000) RETURNING id`,
+      [tables[1].id]
+    );
+    await client.query(
+      `INSERT INTO order_items (order_id, menu_item_id, quantity, price_per_unit, total_price, status) VALUES ($1, $2, 1, 120000, 120000, 'pending')`,
+      [p2.rows[0].id, items.find((i) => i.name.includes("Mỳ")).id]
+    );
 
     // Case 3: Đang nấu (Preparing) - Để KDS báo xong
-    const p3 = await client.query(`INSERT INTO orders (table_id, customer_name, status, total_amount) VALUES ($1, 'Mr. C (Đang nấu)', 'accepted', 85000) RETURNING id`, [tables[2].id]);
-    await client.query(`INSERT INTO order_items (order_id, menu_item_id, quantity, price_per_unit, total_price, status) VALUES ($1, $2, 1, 85000, 85000, 'preparing')`, [p3.rows[0].id, items.find(i=>i.name.includes('Salad')).id]);
+    const p3 = await client.query(
+      `INSERT INTO orders (table_id, customer_name, status, total_amount) VALUES ($1, 'Mr. C (Đang nấu)', 'accepted', 85000) RETURNING id`,
+      [tables[2].id]
+    );
+    await client.query(
+      `INSERT INTO order_items (order_id, menu_item_id, quantity, price_per_unit, total_price, status) VALUES ($1, $2, 1, 85000, 85000, 'preparing')`,
+      [p3.rows[0].id, items.find((i) => i.name.includes("Salad")).id]
+    );
 
     // Case 4: Đã xong (Ready) - Để Waiter bưng
-    const p4 = await client.query(`INSERT INTO orders (table_id, customer_name, status, total_amount) VALUES ($1, 'Family D (Chờ bưng)', 'ready', 55000) RETURNING id`, [tables[3].id]);
-    await client.query(`INSERT INTO order_items (order_id, menu_item_id, quantity, price_per_unit, total_price, status) VALUES ($1, $2, 1, 55000, 55000, 'ready')`, [p4.rows[0].id, items.find(i=>i.name.includes('Trà sữa')).id]);
+    const p4 = await client.query(
+      `INSERT INTO orders (table_id, customer_name, status, total_amount) VALUES ($1, 'Family D (Chờ bưng)', 'ready', 55000) RETURNING id`,
+      [tables[3].id]
+    );
+    await client.query(
+      `INSERT INTO order_items (order_id, menu_item_id, quantity, price_per_unit, total_price, status) VALUES ($1, $2, 1, 55000, 55000, 'ready')`,
+      [p4.rows[0].id, items.find((i) => i.name.includes("Trà sữa")).id]
+    );
 
     // Case 5: Đã ăn xong (Served) - Để test Thanh toán
-    const p5 = await client.query(`INSERT INTO orders (table_id, customer_name, status, total_amount) VALUES ($1, 'Group E (Ăn xong)', 'served', 470000) RETURNING id`, [tables[4].id]);
-    await client.query(`INSERT INTO order_items (order_id, menu_item_id, quantity, price_per_unit, total_price, status) VALUES ($1, $2, 2, 220000, 440000, 'served')`, [p5.rows[0].id, items.find(i=>i.name.includes('Cá hồi')).id]);
+    const p5 = await client.query(
+      `INSERT INTO orders (table_id, customer_name, status, total_amount) VALUES ($1, 'Group E (Ăn xong)', 'served', 470000) RETURNING id`,
+      [tables[4].id]
+    );
+    await client.query(
+      `INSERT INTO order_items (order_id, menu_item_id, quantity, price_per_unit, total_price, status) VALUES ($1, $2, 2, 220000, 440000, 'served')`,
+      [p5.rows[0].id, items.find((i) => i.name.includes("Cá hồi")).id]
+    );
 
     console.log("🌱 Seeded 5 Active Scenarios (Pending -> Served)");
     console.log("🎉 MIGRATION & SEEDING COMPLETED SUCCESSFULLY!");

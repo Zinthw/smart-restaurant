@@ -3,23 +3,26 @@
 import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import { ArrowLeft, Clock, CheckCircle, ChefHat, Bell, Sparkles, CreditCard, Plus } from "lucide-react"
+import { ArrowLeft, Clock, CheckCircle, ChefHat, Bell, Sparkles, CreditCard, Plus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatPrice } from "@/lib/menu-data"
+import { orderAPI } from "@/lib/api"
 
 interface Order {
   id: string
-  items: Array<{
-    menuItem: { name: string; price: number; image: string }
-    quantity: number
-    totalPrice: number
-    selectedModifiers: Array<{ name: string }>
-  }>
-  tableId: string
+  table_id: string
   status: "pending" | "accepted" | "preparing" | "ready" | "served" | "paid"
-  subtotal: number
-  createdAt: string
+  total_amount: number
+  created_at: string
   notes?: string
+  items: Array<{
+    id: string
+    item_name: string
+    quantity: number
+    price_per_unit: number
+    total_price: number
+    modifiers_selected?: any
+  }>
 }
 
 const statusSteps = [
@@ -35,20 +38,24 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
   const { orderId } = use(params)
   const router = useRouter()
   const [order, setOrder] = useState<Order | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  const fetchOrder = async () => {
+    try {
+      const data = await orderAPI.getOrder(orderId)
+      setOrder(data as Order)
+    } catch (error) {
+      console.error("Failed to fetch order:", error)
+      setOrder(null)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    // Get order from localStorage (demo)
-    const storedOrders = JSON.parse(localStorage.getItem("orders") || "[]")
-    const foundOrder = storedOrders.find((o: Order) => o.id === orderId)
-    setOrder(foundOrder || null)
-
-    // Simulate real-time updates
-    const interval = setInterval(() => {
-      const updatedOrders = JSON.parse(localStorage.getItem("orders") || "[]")
-      const updated = updatedOrders.find((o: Order) => o.id === orderId)
-      if (updated) setOrder(updated)
-    }, 5000)
-
+    fetchOrder()
+    // Poll for updates every 5 seconds
+    const interval = setInterval(fetchOrder, 5000)
     return () => clearInterval(interval)
   }, [orderId])
 
@@ -149,27 +156,26 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
           <div className="divide-y divide-border">
             {order.items.map((item, index) => (
               <div key={index} className="flex gap-3 p-4">
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg">
-                  <Image
-                    src={item.menuItem.image || "/placeholder.svg"}
-                    alt={item.menuItem.name}
-                    fill
-                    className="object-cover"
-                  />
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
+                  <span className="text-2xl">🍽️</span>
                 </div>
                 <div className="flex-1">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h4 className="font-medium text-card-foreground">{item.menuItem.name}</h4>
-                      {item.selectedModifiers?.length > 0 && (
+                      <h4 className="font-medium text-card-foreground">{item.item_name}</h4>
+                      {item.modifiers_selected && (
                         <p className="text-xs text-muted-foreground">
-                          {item.selectedModifiers.map((m) => m.name).join(", ")}
+                          {typeof item.modifiers_selected === 'string'
+                            ? item.modifiers_selected
+                            : Array.isArray(item.modifiers_selected)
+                              ? item.modifiers_selected.map((m: any) => m.name).join(", ")
+                              : ""}
                         </p>
                       )}
                     </div>
                     <span className="text-sm text-muted-foreground">x{item.quantity}</span>
                   </div>
-                  <p className="mt-1 font-medium text-primary">{formatPrice(item.totalPrice * item.quantity)}</p>
+                  <p className="mt-1 font-medium text-primary">{formatPrice(item.total_price)}</p>
                 </div>
               </div>
             ))}
@@ -180,7 +186,7 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
         <div className="mb-6 rounded-lg border border-border bg-card p-4">
           <div className="flex items-center justify-between">
             <span className="font-medium text-card-foreground">Tổng cộng</span>
-            <span className="text-xl font-bold text-primary">{formatPrice(order.subtotal)}</span>
+            <span className="text-xl font-bold text-primary">{formatPrice(order.total_amount)}</span>
           </div>
         </div>
 
@@ -192,12 +198,12 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
           </div>
           <div className="flex justify-between py-1">
             <span className="text-muted-foreground">Bàn</span>
-            <span className="font-medium text-card-foreground">{order.tableId}</span>
+            <span className="font-medium text-card-foreground">{order.table_id}</span>
           </div>
           <div className="flex justify-between py-1">
             <span className="text-muted-foreground">Thời gian</span>
             <span className="font-medium text-card-foreground">
-              {new Date(order.createdAt).toLocaleString("vi-VN")}
+              {new Date(order.created_at).toLocaleString("vi-VN")}
             </span>
           </div>
           {order.notes && (

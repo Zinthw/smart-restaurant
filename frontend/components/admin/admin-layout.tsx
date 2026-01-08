@@ -16,6 +16,7 @@ import {
   Menu,
   X,
   ChefHat,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -134,6 +135,14 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               </p>
             </div>
           </div>
+          <Link
+            href="/admin/change-password"
+            className="flex items-center w-full justify-start px-3 py-2 mb-2 rounded-lg text-sm text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <Lock className="mr-2 h-4 w-4" />
+            Đổi mật khẩu
+          </Link>
           <Button
             variant="ghost"
             className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"

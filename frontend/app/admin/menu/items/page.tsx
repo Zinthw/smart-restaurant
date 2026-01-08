@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { AdminLayout } from "@/components/admin/admin-layout";
+import { getImageUrl } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -380,7 +381,7 @@ export default function MenuItemsPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleOpenEditDialog = (item: MenuItem) => {
+  const handleOpenEditDialog = async (item: MenuItem) => {
     setEditingItem(item);
     setFormData({
       name: item.name,
@@ -390,7 +391,17 @@ export default function MenuItemsPage() {
       prep_time_minutes: (item.prep_time_minutes || 15).toString(),
       is_chef_recommended: item.is_chef_recommended || false,
     });
-    setSelectedModifiers(item.modifier_groups || []);
+
+    // Load modifiers from API
+    try {
+      const modifierGroupIds = await adminAPI.items.getModifiers(item.id);
+      console.log("Loaded modifiers for item:", item.id, modifierGroupIds);
+      setSelectedModifiers(modifierGroupIds);
+    } catch (err) {
+      console.error("Failed to load modifiers:", err);
+      setSelectedModifiers([]);
+    }
+
     setIsDialogOpen(true);
   };
 
@@ -429,7 +440,12 @@ export default function MenuItemsPage() {
       // Always save modifiers (even empty array to clear them)
       if (itemId) {
         try {
-          console.log("Saving modifiers for item:", itemId, "modifiers:", selectedModifiers);
+          console.log(
+            "Saving modifiers for item:",
+            itemId,
+            "modifiers:",
+            selectedModifiers
+          );
           await adminAPI.items.setModifiers(itemId, selectedModifiers);
           console.log("Modifiers saved successfully");
         } catch (err) {
@@ -485,7 +501,8 @@ export default function MenuItemsPage() {
 
   const getItemImage = (item: MenuItem) => {
     const primaryPhoto = item.photos?.find((p) => p.is_primary);
-    return primaryPhoto?.url || item.photos?.[0]?.url || "/placeholder.svg";
+    const photoUrl = primaryPhoto?.url || item.photos?.[0]?.url;
+    return getImageUrl(photoUrl);
   };
 
   return (
@@ -1129,7 +1146,7 @@ export default function MenuItemsPage() {
                       className="group relative aspect-square overflow-hidden rounded-lg border"
                     >
                       <Image
-                        src={photo.photo_url || photo.url || "/placeholder.jpg"}
+                        src={getImageUrl(photo.photo_url || photo.url)}
                         alt={`Photo ${index + 1}`}
                         fill
                         className="object-cover"

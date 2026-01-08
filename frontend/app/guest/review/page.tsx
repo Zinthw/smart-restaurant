@@ -4,26 +4,48 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Star, Send, CheckCircle } from "lucide-react"
+import { ArrowLeft, Star, Send, CheckCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { menuItems } from "@/lib/menu-data"
+import { reviewsAPI, menuAPI } from "@/lib/api"
+
+interface MenuItem {
+  id: string
+  name: string
+}
 
 export default function ReviewPage() {
   const router = useRouter()
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [selectedItem, setSelectedItem] = useState("")
   const [rating, setRating] = useState(0)
   const [hoveredRating, setHoveredRating] = useState(0)
   const [comment, setComment] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [error, setError] = useState("")
 
   useEffect(() => {
     const token = localStorage.getItem("customerToken")
     setIsLoggedIn(!!token)
+
+    // Fetch menu items for selection
+    const fetchMenuItems = async () => {
+      try {
+        const response = await menuAPI.getItems()
+        setMenuItems(response.data || [])
+      } catch (err) {
+        console.error("Failed to fetch menu items:", err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchMenuItems()
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,20 +53,25 @@ export default function ReviewPage() {
     if (!selectedItem || rating === 0) return
 
     setIsSubmitting(true)
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    setError("")
 
-    // Store review (demo)
-    const reviews = JSON.parse(localStorage.getItem("reviews") || "[]")
-    reviews.push({
-      itemId: selectedItem,
-      rating,
-      comment,
-      createdAt: new Date().toISOString(),
-    })
-    localStorage.setItem("reviews", JSON.stringify(reviews))
+    try {
+      await reviewsAPI.submitReview(selectedItem, { rating, comment: comment || undefined })
+      setIsSubmitted(true)
+    } catch (err: any) {
+      console.error("Failed to submit review:", err)
+      setError(err.message || "Không thể gửi đánh giá. Vui lòng thử lại.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
-    setIsSubmitting(false)
-    setIsSubmitted(true)
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   if (!isLoggedIn) {
@@ -113,6 +140,13 @@ export default function ReviewPage() {
           <h2 className="text-xl font-bold text-foreground">Chia sẻ trải nghiệm của bạn</h2>
           <p className="mt-2 text-muted-foreground">Giúp chúng tôi cải thiện chất lượng món ăn</p>
         </div>
+
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Item Selection */}

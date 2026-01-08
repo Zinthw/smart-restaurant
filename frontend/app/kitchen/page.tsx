@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Clock,
   ChefHat,
@@ -10,6 +11,8 @@ import {
   Volume2,
   VolumeX,
   Loader2,
+  LogOut,
+  Key,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,16 +43,18 @@ interface KitchenOrder {
   table_number: number;
   order_status: string;
   created_at: string;
+  customer_name?: string;
   items: OrderItem[];
 }
 
 const statusColumns = [
-  { key: "accepted", label: "New Orders", icon: Clock, color: "bg-warning" },
-  { key: "preparing", label: "Preparing", icon: ChefHat, color: "bg-primary" },
-  { key: "ready", label: "Ready", icon: Bell, color: "bg-success" },
+  { key: "accepted", label: "Đơn mới", icon: Clock, color: "bg-warning" },
+  { key: "preparing", label: "Đang nấu", icon: ChefHat, color: "bg-primary" },
+  { key: "ready", label: "Sẵn sàng", icon: Bell, color: "bg-success" },
 ];
 
 export default function KitchenDisplayPage() {
+  const router = useRouter();
   const { toast } = useToast();
   const [orders, setOrders] = useState<KitchenOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +65,7 @@ export default function KitchenDisplayPage() {
   const [rejectReason, setRejectReason] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [processingOrder, setProcessingOrder] = useState<number | null>(null);
+  const [kitchenName, setKitchenName] = useState("Kitchen");
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -76,6 +82,22 @@ export default function KitchenDisplayPage() {
       setLoading(false);
     }
   }, [toast]);
+
+  useEffect(() => {
+    // Check auth
+    const token =
+      localStorage.getItem("kitchenToken") ||
+      localStorage.getItem("admin_token");
+    const name =
+      localStorage.getItem("kitchenName") || localStorage.getItem("adminName");
+
+    if (!token) {
+      router.push("/kitchen/login");
+      return;
+    }
+
+    if (name) setKitchenName(name);
+  }, [router]);
 
   useEffect(() => {
     fetchOrders();
@@ -164,6 +186,13 @@ export default function KitchenDisplayPage() {
     fetchOrders();
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("kitchenToken");
+    localStorage.removeItem("kitchenName");
+    localStorage.removeItem("kitchenRole");
+    router.push("/kitchen/login");
+  };
+
   const getOrdersByStatus = (status: string) => {
     return orders.filter((order) => order.order_status === status);
   };
@@ -235,6 +264,17 @@ export default function KitchenDisplayPage() {
           <Button variant="outline" size="icon" onClick={fetchOrders}>
             <RefreshCw className="h-4 w-4" />
           </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => router.push("/kitchen/change-password")}
+            title="Đổi mật khẩu"
+          >
+            <Key className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handleLogout}>
+            <LogOut className="h-4 w-4" />
+          </Button>
         </div>
       </header>
 
@@ -247,7 +287,7 @@ export default function KitchenDisplayPage() {
           return (
             <div
               key={column.key}
-              className="flex w-80 shrink-0 flex-col rounded-lg border border-border bg-card"
+              className="flex flex-1 min-w-[320px] flex-col rounded-lg border border-border bg-card"
             >
               {/* Column Header */}
               <div

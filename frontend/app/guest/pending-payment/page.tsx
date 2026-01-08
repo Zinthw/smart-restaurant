@@ -2,23 +2,27 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { CreditCard, Banknote, Building2, CheckCircle } from "lucide-react"
+import { CreditCard, Banknote, Building2, CheckCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { BottomNavigation } from "@/components/guest/bottom-navigation"
 import { CartDrawer } from "@/components/guest/cart-drawer"
 import { formatPrice } from "@/lib/menu-data"
+import { paymentAPI, orderAPI } from "@/lib/api"
 
 interface Order {
   id: string
-  items: Array<{
-    menuItem: { name: string }
-    quantity: number
-    totalPrice: number
-  }>
-  tableId: string
+  table_id: string
+  table_number: number
   status: string
-  subtotal: number
-  createdAt: string
+  total_amount: number
+  created_at: string
+  items: Array<{
+    id: string
+    item_name: string
+    quantity: number
+    price: number
+    total_price: number
+  }>
 }
 
 type PaymentMethod = "cash" | "card" | "transfer"
@@ -33,35 +37,69 @@ export default function PendingPaymentPage() {
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("cash")
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isProcessing, setIsProcessing] = useState(false)
   const [isCartOpen, setIsCartOpen] = useState(false)
+  const [error, setError] = useState("")
+  const [tableId, setTableId] = useState<string | null>(null)
 
   useEffect(() => {
-    // Get orders from localStorage - filter to served but unpaid orders
-    const storedOrders = JSON.parse(localStorage.getItem("orders") || "[]")
-    const servedOrders = storedOrders.filter((order: Order) => order.status === "served")
-    setOrders(servedOrders)
+    // Get table ID from guest_table storage
+    const guestTable = localStorage.getItem("guest_table")
+    if (guestTable) {
+      try {
+        const parsed = JSON.parse(guestTable)
+        setTableId(parsed.tableId || null)
+      } catch {
+        setTableId(null)
+      }
+    }
   }, [])
 
-  const grandTotal = orders.reduce((sum, order) => sum + order.subtotal, 0)
+  useEffect(() => {
+    if (!tableId) {
+      setIsLoading(false)
+      return
+    }
+
+    const fetchBill = async () => {
+      try {
+        // Get orders for table and filter to served orders
+        const tableOrders = await orderAPI.getTableOrders(tableId)
+        const servedOrders = tableOrders.filter(order => order.status === "served")
+        setOrders(servedOrders as Order[])
+      } catch (err: any) {
+        console.error("Failed to fetch orders:", err)
+        setError(err.message || "Không thể tải đơn hàng")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchBill()
+  }, [tableId])
+
+  const grandTotal = orders.reduce((sum, order) => sum + order.total_amount, 0)
 
   const handlePayment = async () => {
     if (orders.length === 0) return
 
-    setIsLoading(true)
+    setIsProcessing(true)
+    setError("")
 
-    // Simulate payment processing
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    try {
+      // Process payment for each order
+      for (const order of orders) {
+        await paymentAPI.processPayment(order.id, selectedMethod)
+      }
 
-    // Update orders to paid status
-    const storedOrders = JSON.parse(localStorage.getItem("orders") || "[]")
-    const updatedOrders = storedOrders.map((order: Order) =>
-      orders.find((o) => o.id === order.id) ? { ...order, status: "paid", paidAt: new Date().toISOString() } : order,
-    )
-    localStorage.setItem("orders", JSON.stringify(updatedOrders))
-
-    setIsLoading(false)
-    router.push(`/guest/payment/${orders[0].id}`)
+      // Navigate to first order's receipt page
+      router.push(`/guest/payment/${orders[0].id}`)
+    } catch (err: any) {
+      setError(err.message || "Thanh toán thất bại. Vui lòng thử lại.")
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   return (
@@ -71,7 +109,19 @@ export default function PendingPaymentPage() {
       </header>
 
       <main className="mx-auto max-w-lg p-4">
-        {orders.length === 0 ? (
+        {/* Error Display */}
+        {error && (
+          <div className="mb-4 rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-24">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="mt-4 text-muted-foreground">Đang tải đơn hàng...</p>
+          </div>
+        ) : orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="mb-4 rounded-full bg-muted p-4">
               <CreditCard className="h-8 w-8 text-muted-foreground" />
@@ -95,7 +145,7 @@ export default function PendingPaymentPage() {
                     <div className="mb-2 flex items-center justify-between">
                       <span className="font-mono text-sm font-medium text-card-foreground">#{order.id.slice(-6)}</span>
                       <span className="text-xs text-muted-foreground">
-                        {new Date(order.createdAt).toLocaleTimeString("vi-VN", {
+                        {new Date(order.created_at).toLocaleTimeString("vi-VN", {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
@@ -105,14 +155,15 @@ export default function PendingPaymentPage() {
                       {order.items.map((item, index) => (
                         <div key={index} className="flex justify-between text-sm">
                           <span className="text-muted-foreground">
-                            {item.quantity}x {item.menuItem.name}
+                            {item.quantity}x {item.item_name}
                           </span>
+                          <span className="text-muted-foreground">{formatPrice(item.total_price)}</span>
                         </div>
                       ))}
                     </div>
                     <div className="flex justify-between border-t border-border pt-2">
                       <span className="text-sm text-muted-foreground">Tạm tính</span>
-                      <span className="font-medium text-card-foreground">{formatPrice(order.subtotal)}</span>
+                      <span className="font-medium text-card-foreground">{formatPrice(order.total_amount)}</span>
                     </div>
                   </div>
                 ))}
@@ -172,9 +223,12 @@ export default function PendingPaymentPage() {
               <span className="text-muted-foreground">Tổng thanh toán</span>
               <span className="text-2xl font-bold text-primary">{formatPrice(grandTotal)}</span>
             </div>
-            <Button className="w-full" size="lg" onClick={handlePayment} disabled={isLoading}>
-              {isLoading ? (
-                "Đang xử lý..."
+            <Button className="w-full" size="lg" onClick={handlePayment} disabled={isProcessing}>
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xử lý...
+                </>
               ) : (
                 <>
                   <CreditCard className="mr-2 h-4 w-4" />

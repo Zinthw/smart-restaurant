@@ -9,13 +9,11 @@ import { MenuHeader } from "@/components/guest/menu-header";
 import { MenuItemCard } from "@/components/guest/menu-item-card";
 import { useCart } from "@/lib/cart-context";
 import {
-  categories as mockCategories,
-  menuItems as mockMenuItems,
   type MenuItem,
   type ModifierOption,
   type Category,
 } from "@/lib/menu-data";
-import { menuAPI } from "@/lib/api";
+import { menuAPI, getImageUrl } from "@/lib/api";
 
 export default function GuestMenuPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -25,72 +23,74 @@ export default function GuestMenuPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   // Data states
-  const [categories, setCategories] = useState<Category[]>(mockCategories);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(mockMenuItems);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tableId, setTableId] = useState<string>("12");
+  const [error, setError] = useState("");
+  const [tableNumber, setTableNumber] = useState<string>("");
 
   const { dispatch } = useCart();
 
-  // Fetch data from API
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Get table info from URL or localStorage
-        const params = new URLSearchParams(window.location.search);
-        const tableFromUrl = params.get("table");
-        const tableFromStorage = localStorage.getItem("guest_table");
+  const fetchData = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      // Get table info from localStorage (saved when scanning QR)
+      const tableFromStorage = localStorage.getItem("guest_table");
 
-        if (tableFromUrl) {
-          setTableId(tableFromUrl);
-          localStorage.setItem(
-            "guest_table",
-            JSON.stringify({ tableId: tableFromUrl })
-          );
-        } else if (tableFromStorage) {
+      if (tableFromStorage) {
+        try {
           const parsed = JSON.parse(tableFromStorage);
-          setTableId(parsed.tableId || "12");
+          // Ưu tiên tableNumber (số bàn thực tế), fallback sang tableId
+          setTableNumber(parsed.tableNumber || parsed.tableId || "");
+        } catch {
+          setTableNumber("");
         }
-
-        // Fetch categories
-        const categoriesRes = await menuAPI.getCategories();
-        if (categoriesRes.data && categoriesRes.data.length > 0) {
-          const apiCategories: Category[] = [
-            { id: "all", name: "Tất cả", icon: "🍽️" },
-            ...categoriesRes.data.map((cat: any) => ({
-              id: cat.id,
-              name: cat.name,
-              icon: cat.icon || "🍴",
-            })),
-          ];
-          setCategories(apiCategories);
-        }
-
-        // Fetch menu items
-        const itemsRes = await menuAPI.getItems();
-        if (itemsRes.data && itemsRes.data.length > 0) {
-          const apiItems: MenuItem[] = itemsRes.data.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            description: item.description || "",
-            price: item.price,
-            image: item.image_url || item.image || "/placeholder.svg",
-            category: item.category_id || item.category,
-            rating: item.rating || 4.5,
-            reviews: item.reviews || 0,
-            isAvailable: item.is_available !== false,
-            modifiers: item.modifiers || [],
-          }));
-          setMenuItems(apiItems);
-        }
-      } catch (error) {
-        console.log("Using mock data - API not available:", error);
-        // Keep using mock data if API fails
-      } finally {
-        setLoading(false);
       }
-    };
 
+      // Fetch categories
+      const categoriesRes = await menuAPI.getCategories();
+      if (categoriesRes.data && categoriesRes.data.length > 0) {
+        const apiCategories: Category[] = [
+          { id: "all", name: "Tất cả", icon: "🍽️" },
+          ...categoriesRes.data.map((cat: any) => ({
+            id: cat.id,
+            name: cat.name,
+            icon: cat.icon || "🍴",
+          })),
+        ];
+        setCategories(apiCategories);
+      }
+
+      // Fetch menu items
+      const itemsRes = await menuAPI.getItems();
+      if (itemsRes.data && itemsRes.data.length > 0) {
+        const apiItems: MenuItem[] = itemsRes.data.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          description: item.description || "",
+          price: item.price,
+          image: getImageUrl(item.primary_photo),
+          category: item.category_id || item.category,
+          rating: item.rating || 4.5,
+          reviews: item.reviews || 0,
+          isAvailable:
+            item.is_available !== false && item.status !== "sold_out",
+          modifiers: item.modifiers || [],
+        }));
+        setMenuItems(apiItems);
+      }
+    } catch (err: any) {
+      console.error("API Error:", err);
+      setError(
+        err.message || "Không thể tải menu. Vui lòng kiểm tra kết nối mạng."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, []);
 
@@ -103,7 +103,7 @@ export default function GuestMenuPage() {
         activeCategory === "all" || item.category === activeCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, activeCategory]);
+  }, [menuItems, searchQuery, activeCategory]);
 
   const handleQuickAdd = (item: MenuItem) => {
     if (item.modifiers && item.modifiers.length > 0) {
@@ -128,7 +128,7 @@ export default function GuestMenuPage() {
     modifiers: ModifierOption[],
     notes: string
   ) => {
-    const modifierTotal = modifiers.reduce((sum, mod) => sum + mod.price, 0);
+    const modifierTotal = modifiers.reduce((acc, mod) => acc + mod.price, 0);
     dispatch({
       type: "ADD_ITEM",
       payload: {
@@ -146,7 +146,7 @@ export default function GuestMenuPage() {
       <MenuHeader
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        tableId={tableId}
+        tableId={tableNumber}
       />
 
       <CategoryTabs
@@ -160,6 +160,18 @@ export default function GuestMenuPage() {
           <div className="flex flex-col items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-4"></div>
             <p className="text-muted-foreground">Đang tải menu...</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="mb-4 text-destructive text-4xl">❌</div>
+            <p className="text-destructive font-medium mb-2">Lỗi tải dữ liệu</p>
+            <p className="text-sm text-muted-foreground mb-4">{error}</p>
+            <button
+              onClick={fetchData}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg"
+            >
+              Thử lại
+            </button>
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">

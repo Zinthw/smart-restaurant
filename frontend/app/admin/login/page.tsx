@@ -5,7 +5,7 @@ import type React from "react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, ChefHat } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, ChefHat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -118,6 +118,13 @@ export default function AdminLoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Chọn role khác
+        </Link>
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
             <ChefHat className="h-8 w-8 text-primary-foreground" />
