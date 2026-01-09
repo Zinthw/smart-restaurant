@@ -158,6 +158,9 @@ router.post("/", async (req, res, next) => {
 
 router.put("/:id", async (req, res, next) => {
   try {
+    console.log("PUT /items/:id - ID:", req.params.id);
+    console.log("PUT /items/:id - Body:", req.body);
+
     const {
       category_id,
       name,
@@ -184,6 +187,7 @@ router.put("/:id", async (req, res, next) => {
         "SELECT 1 FROM menu_categories WHERE id = $1",
         [category_id]
       );
+      console.log("Category check result:", catCheck.rowCount);
       if (catCheck.rowCount === 0)
         return res.status(400).json({ message: "Category not found" });
     }
@@ -205,9 +209,11 @@ router.put("/:id", async (req, res, next) => {
         req.params.id,
       ]
     );
+    console.log("Update result:", rows[0] ? "Found" : "Not found");
     if (!rows[0]) return res.status(404).json({ message: "Item not found" });
     res.json(rows[0]);
   } catch (err) {
+    console.error("PUT /items/:id ERROR:", err.message);
     next(err);
   }
 });
@@ -239,6 +245,56 @@ router.patch("/:id/status", async (req, res, next) => {
     res.json(rows[0]);
   } catch (err) {
     next(err);
+  }
+});
+
+// Get modifier groups for a menu item
+router.get("/:id/modifier-groups", async (req, res, next) => {
+  try {
+    const itemId = req.params.id;
+    const { rows } = await db.query(
+      `SELECT modifier_group_id FROM menu_item_modifier_groups 
+       WHERE menu_item_id = $1 ORDER BY sort_order`,
+      [itemId]
+    );
+    res.json(rows.map((r) => r.modifier_group_id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Set modifier groups for a menu item
+router.post("/:id/modifier-groups", async (req, res, next) => {
+  const client = await db.pool.connect();
+  try {
+    await client.query("BEGIN");
+    const itemId = req.params.id;
+    const { groupIds } = req.body;
+
+    if (!Array.isArray(groupIds)) throw new Error("groupIds must be an array");
+
+    await client.query(
+      "DELETE FROM menu_item_modifier_groups WHERE menu_item_id = $1",
+      [itemId]
+    );
+
+    if (groupIds.length > 0) {
+      for (let i = 0; i < groupIds.length; i++) {
+        await client.query(
+          `INSERT INTO menu_item_modifier_groups (menu_item_id, modifier_group_id, sort_order) 
+           VALUES ($1, $2, $3)`,
+          [itemId, groupIds[i], i]
+        );
+      }
+    }
+
+    await client.query("COMMIT");
+    res.json({ message: "Modifiers updated for menu item successfully" });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    next(err);
+  } finally {
+    client.release();
   }
 });
 

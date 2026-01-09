@@ -7,16 +7,16 @@ const router = express.Router();
 // API VERIFY QR CODE
 router.get("/verify", async (req, res, next) => {
   try {
-    const { tableId, token } = req.query;
+    // Hỗ trợ cả 2 param name: tableId (cũ) và table (mới từ QR URL)
+    const tableId = req.query.tableId || req.query.table;
+    const token = req.query.token;
 
     if (!tableId || !token) {
-      return res
-        .status(400)
-        .json({
-          valid: false,
-          code: "MISSING_PARAMS",
-          message: "Missing authentication parameters.",
-        });
+      return res.status(400).json({
+        valid: false,
+        code: "MISSING_PARAMS",
+        message: "Missing authentication parameters.",
+      });
     }
 
     // Verify JWT Signature
@@ -37,13 +37,11 @@ router.get("/verify", async (req, res, next) => {
     const table = rows[0];
 
     if (!table) {
-      return res
-        .status(404)
-        .json({
-          valid: false,
-          code: "TABLE_NOT_FOUND",
-          message: "Table not found.",
-        });
+      return res.status(404).json({
+        valid: false,
+        code: "TABLE_NOT_FOUND",
+        message: "Table not found.",
+      });
     }
 
     // Check Token khớp trong DB (Chống dùng lại QR cũ)
@@ -77,8 +75,20 @@ router.get("/verify", async (req, res, next) => {
   }
 });
 
-// API LẤY MENU CHO KHÁCH
-router.get("/", async (req, res, next) => {
+// API LẤY DANH MỤC (New)
+router.get("/categories", async (req, res, next) => {
+  try {
+    const { rows } = await db.query(
+      "SELECT * FROM menu_categories WHERE status = 'active' AND deleted_at IS NULL ORDER BY sort_order ASC"
+    );
+    res.json({ data: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// API LẤY MÓN ĂN (New - Returns flat list)
+router.get("/items", async (req, res, next) => {
   try {
     const {
       q,
@@ -90,13 +100,7 @@ router.get("/", async (req, res, next) => {
       order = "desc",
     } = req.query;
 
-    // A. Lấy Danh Mục (Active)
-    const catRes = await db.query(
-      "SELECT * FROM menu_categories WHERE status = 'active' AND deleted_at IS NULL ORDER BY sort_order ASC"
-    );
-    const categories = catRes.rows;
-
-    // B. Build Query Lấy Món Ăn
+    // Build Query Lấy Món Ăn
     let itemQuery = `
       SELECT 
         i.*, 
@@ -156,7 +160,7 @@ router.get("/", async (req, res, next) => {
         };
       })
     );
-    // C. Lấy Modifiers
+    // Lấy Modifiers
     let modifiers = [];
     if (items.length > 0) {
       const itemIds = items.map((it) => `'${it.id}'`).join(",");
@@ -175,7 +179,7 @@ router.get("/", async (req, res, next) => {
       modifiers = modRes.rows;
     }
 
-    // D. Ghép dữ liệu (Stitching)
+    // Ghép dữ liệu (Stitching)
     items.forEach((item) => {
       const myMods = modifiers.filter((m) => m.menu_item_id === item.id);
       const groupsMap = {};
@@ -202,17 +206,8 @@ router.get("/", async (req, res, next) => {
       item.modifiers = Object.values(groupsMap);
     });
 
-    const result = categories
-      .map((cat) => {
-        return {
-          ...cat,
-          items: items.filter((it) => it.category_id === cat.id),
-        };
-      })
-      .filter((cat) => cat.items.length > 0);
-
     res.json({
-      data: result,
+      data: items,
       pagination: { page: parseInt(page), limit: limitVal },
     });
   } catch (err) {

@@ -168,38 +168,4 @@ router.delete("/modifier-options/:id", async (req, res, next) => {
   }
 });
 
-router.post("/items/:id/modifier-groups", async (req, res, next) => {
-  const client = await db.pool.connect();
-  try {
-    await client.query("BEGIN");
-    const itemId = req.params.id;
-    const { groupIds } = req.body;
-
-    if (!Array.isArray(groupIds)) throw new Error("groupIds must be an array");
-
-    await client.query(
-      "DELETE FROM menu_item_modifier_groups WHERE menu_item_id = $1",
-      [itemId]
-    );
-
-    if (groupIds.length > 0) {
-      for (let i = 0; i < groupIds.length; i++) {
-        await client.query(
-          `INSERT INTO menu_item_modifier_groups (menu_item_id, modifier_group_id, sort_order) 
-                 VALUES ($1, $2, $3)`,
-          [itemId, groupIds[i], i]
-        );
-      }
-    }
-
-    await client.query("COMMIT");
-    res.json({ message: "Modifiers updated for menu item successfully" });
-  } catch (err) {
-    await client.query("ROLLBACK");
-    next(err);
-  } finally {
-    client.release();
-  }
-});
-
 module.exports = router;
