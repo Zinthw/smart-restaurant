@@ -4,8 +4,12 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
+const { OAuth2Client } = require("google-auth-library");
 
 const router = express.Router();
+
+// Google OAuth Client
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Register new staff (Roles: staff, waiter, kitchen)
 router.post("/register", async (req, res, next) => {
@@ -134,6 +138,122 @@ router.post("/guest/register", async (req, res, next) => {
     res.status(201).json({ message: "Registration successful", user: rows[0] });
   } catch (err) {
     next(err);
+  }
+});
+
+// ============ GOOGLE OAUTH ============
+router.post("/google", async (req, res, next) => {
+  try {
+    const { idToken } = req.body; // Token từ Frontend (Login with Google button)
+
+    if (!idToken) {
+      return res.status(400).json({ message: "Google ID token is required" });
+    }
+
+    // 1. Verify Token với Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken: idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const { email, name, picture, sub: googleId } = payload;
+
+    // 2. Check xem user có chưa trong bảng users (staff)
+    let { rows } = await db.query("SELECT * FROM users WHERE email = $1", [email]);
+    let user = rows[0];
+
+    if (!user) {
+      // 3a. Nếu chưa có -> Tự động đăng ký (Status active vì Google đã verify email)
+      const newUser = await db.query(
+        `INSERT INTO users (email, password_hash, role, status)
+         VALUES ($1, '', 'guest', 'active')
+         RETURNING *`,
+        [email]
+      );
+      user = newUser.rows[0];
+    }
+
+    // 4. Cấp Token JWT của hệ thống
+    const accessToken = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET || "secret",
+      { expiresIn: "1d" }
+    );
+
+    res.json({
+      message: "Google Login successful",
+      token: accessToken,
+      accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: name || user.email,
+        avatar: picture,
+      },
+    });
+  } catch (err) {
+    console.error("Google Auth Error:", err.message);
+    res.status(401).json({ message: "Google authentication failed" });
+  }
+});
+
+// ============ GOOGLE OAUTH FOR CUSTOMERS ============
+router.post("/customer/google", async (req, res, next) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ message: "Google ID token is required" });
+    }
+
+    // 1. Verify Token với Google
+    const ticket = await googleClient.verifyIdToken({
+      idToken: idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const { email, name, picture, sub: googleId } = payload;
+
+    // 2. Check xem customer có chưa
+    let { rows } = await db.query("SELECT * FROM customers WHERE email = $1", [email]);
+    let customer = rows[0];
+
+    if (!customer) {
+      // 3a. Nếu chưa có -> Tự động đăng ký
+      const newCustomer = await db.query(
+        `INSERT INTO customers (email, full_name, password_hash, type)
+         VALUES ($1, $2, '', 'member')
+         RETURNING *`,
+        [email, name]
+      );
+      customer = newCustomer.rows[0];
+    }
+
+    // 4. Cấp Token JWT
+    const accessToken = jwt.sign(
+      { customerId: customer.id, email: customer.email, type: "customer" },
+      process.env.JWT_SECRET || "secret",
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      message: "Google Login successful",
+      token: accessToken,
+      accessToken,
+      customer: {
+        id: customer.id,
+        email: customer.email,
+        fullName: name || customer.full_name,
+        phone: customer.phone,
+        avatar: picture,
+        tier: customer.tier,
+        totalPoints: customer.total_points,
+      },
+    });
+  } catch (err) {
+    console.error("Google Auth Error (Customer):", err.message);
+    res.status(401).json({ message: "Google authentication failed" });
   }
 });
 
