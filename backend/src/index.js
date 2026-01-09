@@ -29,10 +29,11 @@ const photosRouter = require("./routes/photos");
 const modifiersRouter = require("./routes/modifiers");
 const ordersRouter = require("./routes/orders");
 const waiterRouter = require("./routes/waiter");
-
 const kitchenRouter = require("./routes/kitchen");
 const paymentRouter = require("./routes/payment");
 const reportsRouter = require("./routes/reports");
+const reviewsRouter = require("./routes/reviews"); 
+const usersRouter = require("./routes/users");
 
 // New routes
 const customerAuthRouter = require("./routes/customerAuth");
@@ -80,6 +81,10 @@ app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // --- ROUTES ---
 app.use("/api/auth", authLimiter, authRouter);
+
+// New Routes
+app.use("/api/reviews", reviewsRouter); // Reviews (Public read, Private write)
+app.use("/api/users", usersRouter);     // User Profile & Admin Management
 
 // Admin Routes
 app.use("/api/admin/tables", requireAuth, requireRole("admin"), tablesRouter);
