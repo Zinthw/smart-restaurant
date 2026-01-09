@@ -159,7 +159,9 @@ router.post("/google", async (req, res, next) => {
     const { email, name, picture, sub: googleId } = payload;
 
     // 2. Check xem user có chưa trong bảng users (staff)
-    let { rows } = await db.query("SELECT * FROM users WHERE email = $1", [email]);
+    let { rows } = await db.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
     let user = rows[0];
 
     if (!user) {
@@ -216,7 +218,9 @@ router.post("/customer/google", async (req, res, next) => {
     const { email, name, picture, sub: googleId } = payload;
 
     // 2. Check xem customer có chưa
-    let { rows } = await db.query("SELECT * FROM customers WHERE email = $1", [email]);
+    let { rows } = await db.query("SELECT * FROM customers WHERE email = $1", [
+      email,
+    ]);
     let customer = rows[0];
 
     if (!customer) {

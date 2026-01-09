@@ -38,7 +38,6 @@ const usersRouter = require("./routes/users");
 // New routes
 const customerAuthRouter = require("./routes/customerAuth");
 const customerRouter = require("./routes/customer");
-const reviewsRouter = require("./routes/reviews");
 const superadminRouter = require("./routes/superadmin");
 
 const app = express();
