@@ -66,6 +66,7 @@ export default function KitchenDisplayPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [processingOrder, setProcessingOrder] = useState<number | null>(null);
   const [kitchenName, setKitchenName] = useState("Kitchen");
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -84,27 +85,32 @@ export default function KitchenDisplayPage() {
   }, [toast]);
 
   useEffect(() => {
-    // Check auth
+    // Kiểm tra đăng nhập TRƯỚC
     const token =
       localStorage.getItem("kitchenToken") ||
       localStorage.getItem("admin_token");
-    const name =
-      localStorage.getItem("kitchenName") || localStorage.getItem("adminName");
-
+    
+    // Nếu không có token -> Đá về login ngay lập tức & Dừng lại
     if (!token) {
       router.push("/kitchen/login");
       return;
     }
 
-    if (name) setKitchenName(name);
-  }, [router]);
+    // Có token rồi, tắt chế độ kiểm tra -> Cho phép render giao diện Bếp
+    setIsAuthChecking(false);
 
-  useEffect(() => {
+    // Lấy tên hiển thị (nếu có)
+    const name =
+      localStorage.getItem("kitchenName") || localStorage.getItem("adminName");
+    if (name) setKitchenName(name);
+
+    // Có token rồi mới được gọi API
     fetchOrders();
-    // Poll for updates every 5 seconds
+
+    // Thiết lập polling (tự động cập nhật mỗi 5s)
     const interval = setInterval(fetchOrders, 5000);
     return () => clearInterval(interval);
-  }, [fetchOrders]);
+  }, [fetchOrders, router]); // Dependency array gộp chung
 
   useEffect(() => {
     // Update time every second for elapsed time display
@@ -196,6 +202,10 @@ export default function KitchenDisplayPage() {
   const getOrdersByStatus = (status: string) => {
     return orders.filter((order) => order.order_status === status);
   };
+
+  if (isAuthChecking) {
+    return null; 
+  }
 
   if (loading) {
     return (
