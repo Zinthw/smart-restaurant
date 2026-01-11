@@ -65,9 +65,13 @@ export default function HomePage() {
       </div>
 
       <div className="mt-10 text-center text-sm text-muted-foreground">
-        <p>Demo Credentials</p>
-        <p className="mt-1">Admin: admin@restaurant.com / admin123</p>
-        <p>Waiter: waiter@restaurant.com / waiter123</p>
+        <p className="font-medium mb-2">Demo Credentials</p>
+        <div className="flex flex-col gap-1">
+          <p>👑 Admin: admin@restaurant.com</p>
+          <p>📋 Waiter: waiter1@res.com</p>
+          <p>👨‍🍳 Kitchen: kitchen1@res.com</p>
+          <p>PASS CHUNG: 123456</p>
+        </div>
       </div>
     </div>
   )
