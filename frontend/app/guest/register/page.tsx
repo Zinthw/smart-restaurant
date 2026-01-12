@@ -141,25 +141,6 @@ export default function GuestRegisterPage() {
               </button>
             </div>
           </div>
-
-          <div className="flex items-start gap-2">
-            <Checkbox
-              id="terms"
-              checked={acceptTerms}
-              onCheckedChange={(checked) => setAcceptTerms(checked as boolean)}
-            />
-            <Label htmlFor="terms" className="text-sm font-normal leading-relaxed">
-              Tôi đồng ý với{" "}
-              <Link href="/terms" className="text-primary hover:underline">
-                Điều khoản sử dụng
-              </Link>{" "}
-              và{" "}
-              <Link href="/privacy" className="text-primary hover:underline">
-                Chính sách bảo mật
-              </Link>
-            </Label>
-          </div>
-
           <Button type="submit" className="w-full" size="lg" disabled={isLoading || !acceptTerms}>
             {isLoading ? "Đang đăng ký..." : "Đăng ký"}
           </Button>
