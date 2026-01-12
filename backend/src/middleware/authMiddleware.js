@@ -69,8 +69,23 @@ const optionalCustomer = (req, res, next) => {
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+      
+      // Hỗ trợ 2 loại token:
+      // 1. customerAuth token: { customerId, type: 'customer' }
+      // 2. auth.js token: { userId, email, role: 'guest' }
       if (decoded.type === 'customer') {
-        req.customer = decoded;
+        // Token từ customerAuth.js (bảng customers cũ)
+        req.customer = { 
+          ...decoded, 
+          userId: decoded.customerId // Map customerId -> userId để nhất quán
+        };
+      } else if (decoded.userId && decoded.role === 'guest') {
+        // Token từ auth.js (bảng users mới)
+        req.customer = {
+          userId: decoded.userId,
+          email: decoded.email,
+          role: decoded.role
+        };
       }
     } catch (err) {
       // Token không hợp lệ - bỏ qua, tiếp tục như guest

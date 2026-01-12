@@ -18,50 +18,44 @@ async function migrate() {
 
     await client.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
 
-    // --- 1. CLEANUP (Nếu cần reset sạch sẽ thì bỏ comment dòng dưới) ---
+    // --- 1. CLEANUP (Reset database) ---
     await client.query(
       `DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres;`
     );
     console.log("✅ Reset Database");
 
-    // --- 2. CREATE TABLES ---
+    // --- 2. CREATE TABLES (Khớp với database.sql mới) ---
 
-    // Users
+    // Users (Hợp nhất cả Staff và Guest/Customer)
     await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         email VARCHAR(120) NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        role VARCHAR(20) NOT NULL CHECK (role IN ('super_admin', 'admin', 'staff', 'waiter', 'kitchen')),
-        status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+        password_hash VARCHAR(255),
+        full_name VARCHAR(100),
+        phone VARCHAR(20),
+        avatar_url TEXT,
+        role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'staff', 'waiter', 'kitchen', 'guest')),
+        status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'banned')),
+        
+        -- Các cột phục vụ Google Login & Khách hàng (Guest)
+        auth_provider VARCHAR(20) DEFAULT 'local',
+        google_id VARCHAR(255),
+        total_points INT DEFAULT 0,
+        tier VARCHAR(50) DEFAULT 'Bronze',
+        
+        -- Token khôi phục mật khẩu
+        verification_token VARCHAR(255),
         reset_password_token VARCHAR(255),
         reset_password_expires TIMESTAMP,
+        
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('Table "users" ready');
-
-    // Customers (khách quen có tài khoản)
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS customers (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        full_name VARCHAR(100),
-        phone VARCHAR(20) UNIQUE,
-        email VARCHAR(120) UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        type VARCHAR(20) DEFAULT 'member' CHECK (type IN ('walk_in', 'member')),
-        total_points INT DEFAULT 0,
-        tier VARCHAR(20) DEFAULT 'bronze' CHECK (tier IN ('bronze', 'silver', 'gold', 'platinum')),
-        reset_password_token VARCHAR(255),
-        reset_password_expires TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    console.log('Table "customers" ready');
+    console.log('Table "users" ready (unified with guests)');
 
     // Tables
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS tables (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         table_number VARCHAR(50) NOT NULL UNIQUE,
@@ -78,7 +72,7 @@ async function migrate() {
     console.log('Table "tables" ready');
 
     // Menu System
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS menu_categories (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name VARCHAR(100) NOT NULL,
@@ -98,7 +92,7 @@ async function migrate() {
         name VARCHAR(100) NOT NULL,
         description TEXT,
         price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
-        status VARCHAR(20) DEFAULT 'available' CHECK (status IN ('available', 'sold_out', 'hidden')),
+        status VARCHAR(20) DEFAULT 'available' CHECK (status IN ('available', 'unavailable', 'sold_out', 'hidden')),
         is_chef_recommended BOOLEAN DEFAULT false,
         prep_time_minutes INT DEFAULT 15 CHECK (prep_time_minutes >= 0 AND prep_time_minutes <= 240),
         order_count INT DEFAULT 0,
@@ -107,16 +101,6 @@ async function migrate() {
         deleted_at TIMESTAMP 
       );
       CREATE INDEX IF NOT EXISTS idx_items_category ON menu_items(category_id);
-
-      DO $$ 
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='menu_items' AND column_name='prep_time_minutes') THEN
-          ALTER TABLE menu_items ADD COLUMN prep_time_minutes INT DEFAULT 15 CHECK (prep_time_minutes >= 0 AND prep_time_minutes <= 240);
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='menu_items' AND column_name='order_count') THEN
-          ALTER TABLE menu_items ADD COLUMN order_count INT DEFAULT 0;
-        END IF;
-      END $$;
     
       CREATE TABLE IF NOT EXISTS menu_item_photos (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -129,7 +113,7 @@ async function migrate() {
     console.log("Menu system ready");
 
     // Modifiers
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS modifier_groups (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name VARCHAR(100) NOT NULL,
@@ -159,17 +143,30 @@ async function migrate() {
     `);
     console.log("Modifiers ready");
 
-    // Orders
-    await pool.query(`
+    // Reviews (đổi tên từ item_reviews, dùng user_id thay vì customer_id)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS reviews (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID REFERENCES users(id),
+        menu_item_id UUID REFERENCES menu_items(id),
+        rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+        comment TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log("Reviews ready");
+
+    // Orders (dùng user_id thay vì customer_id)
+    await client.query(`
       CREATE TABLE IF NOT EXISTS orders (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         table_id UUID REFERENCES tables(id),
-        customer_id UUID REFERENCES customers(id),
+        user_id UUID REFERENCES users(id),
         customer_name VARCHAR(100), 
         customer_phone VARCHAR(20), 
         status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'preparing', 'ready', 'served', 'paid', 'cancelled')),
         total_amount DECIMAL(12, 2) DEFAULT 0,
-        points_earned INT DEFAULT 0,
+        discount_amount DECIMAL(12, 2) DEFAULT 0,
         notes TEXT, 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -190,48 +187,41 @@ async function migrate() {
         status VARCHAR(20) DEFAULT 'pending',  
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
-
-      CREATE TABLE IF NOT EXISTS item_reviews (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        menu_item_id UUID REFERENCES menu_items(id) ON DELETE CASCADE,
-        customer_id UUID REFERENCES customers(id) ON DELETE SET NULL,
-        rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
-        comment TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE INDEX IF NOT EXISTS idx_reviews_item ON item_reviews(menu_item_id);
     `);
-    console.log("Orders & Reviews ready");
+    console.log("Orders ready");
 
-    console.log("✅ ====TABLES CREATED.====");
+    console.log("✅ ==== TABLES CREATED ====");
 
     // --- 3. SEED DATA ---
 
-    // 3.1 Users
+    // 3.1 Users (Staff + Guest trong cùng bảng)
     const passwordHash = await bcrypt.hash("123456", 10);
+    
+    // Staff users
     await client.query(
       `
-      INSERT INTO users (email, password_hash, role) VALUES 
-      ('superadmin@restaurant.com', $1, 'super_admin'),
-      ('admin@restaurant.com', $1, 'admin'),
-      ('waiter@restaurant.com', $1, 'waiter'),
-      ('kitchen@restaurant.com', $1, 'kitchen'),
-      ('staff@restaurant.com', $1, 'staff')
+      INSERT INTO users (email, password_hash, full_name, role, status) VALUES 
+      ('admin@restaurant.com', $1, 'Admin User', 'admin', 'active'),
+      ('waiter@restaurant.com', $1, 'Waiter User', 'waiter', 'active'),
+      ('kitchen@restaurant.com', $1, 'Kitchen User', 'kitchen', 'active'),
+      ('staff@restaurant.com', $1, 'Staff User', 'staff', 'active')
     `,
       [passwordHash]
     );
-    console.log("🌱 Seeded 5 Staff Users (Pass: 123456)");
+    console.log("🌱 Seeded 4 Staff Users (Pass: 123456)");
 
-    // 3.1b Customers (khách quen)
-    await client.query(
+    // Guest users (khách hàng có tài khoản - role: 'guest')
+    const guestRes = await client.query(
       `
-      INSERT INTO customers (full_name, phone, email, password_hash, type, total_points, tier) VALUES 
-      ('Nguyen Van A', '0909111111', 'customer1@example.com', $1, 'member', 150, 'silver'),
-      ('Tran Thi B', '0909222222', 'customer2@example.com', $1, 'member', 50, 'bronze')
+      INSERT INTO users (email, password_hash, full_name, phone, role, total_points, tier, status) VALUES 
+      ('guest1@example.com', $1, 'Nguyễn Văn A', '0909111111', 'guest', 150, 'Silver', 'active'),
+      ('guest2@example.com', $1, 'Trần Thị B', '0909222222', 'guest', 50, 'Bronze', 'active')
+      RETURNING id, full_name
     `,
       [passwordHash]
     );
-    console.log("🌱 Seeded 2 Customer Members (Pass: 123456)");
+    const guests = guestRes.rows;
+    console.log("🌱 Seeded 2 Guest Users (Pass: 123456)");
 
     // 3.2 Tables (15 bàn cho quán lớn)
     const tablesData = [];
@@ -303,31 +293,29 @@ async function migrate() {
     console.log(`🌱 Seeded ${items.length} Menu Items`);
 
     // 3.4 GENERATE PAST ORDERS (Cho Reports API)
-    // Tạo 50 đơn hàng ngẫu nhiên trong 30 ngày qua
     console.log("⏳ Generating 50 past orders for reports...");
-    const pastOrdersValues = [];
-    const pastOrderItemsValues = [];
 
     for (let i = 0; i < 50; i++) {
-      // Random ngày trong 30 ngày qua
       const daysAgo = Math.floor(Math.random() * 30);
       const orderDate = new Date();
       orderDate.setDate(orderDate.getDate() - daysAgo);
       const dateStr = orderDate.toISOString();
 
-      // Random bàn và món
       const table = tables[Math.floor(Math.random() * tables.length)];
       const item1 = items[Math.floor(Math.random() * items.length)];
       const item2 = items[Math.floor(Math.random() * items.length)];
 
       const total = parseFloat(item1.price) + parseFloat(item2.price);
 
+      // Random gắn user_id cho một số order (để test loyalty)
+      const userId = Math.random() > 0.7 ? guests[Math.floor(Math.random() * guests.length)].id : null;
+
       const res = await client.query(
         `
-            INSERT INTO orders (table_id, customer_name, status, total_amount, paid_at, created_at)
-            VALUES ($1, 'Guest Past', 'paid', $2, $3, $3) RETURNING id
+            INSERT INTO orders (table_id, user_id, customer_name, status, total_amount, paid_at, created_at)
+            VALUES ($1, $2, 'Guest Past', 'paid', $3, $4, $4) RETURNING id
         `,
-        [table.id, total, dateStr]
+        [table.id, userId, total, dateStr]
       );
       const orderId = res.rows[0].id;
 
@@ -366,7 +354,7 @@ async function migrate() {
       [p2.rows[0].id, items.find((i) => i.name.includes("Mỳ")).id]
     );
 
-    // Case 3: Đang nấu (Preparing) - Để KDS báo xong
+    // Case 3: Đang nấu (Preparing)
     const p3 = await client.query(
       `INSERT INTO orders (table_id, customer_name, status, total_amount) VALUES ($1, 'Mr. C (Đang nấu)', 'accepted', 85000) RETURNING id`,
       [tables[2].id]
@@ -388,8 +376,8 @@ async function migrate() {
 
     // Case 5: Đã ăn xong (Served) - Để test Thanh toán
     const p5 = await client.query(
-      `INSERT INTO orders (table_id, customer_name, status, total_amount) VALUES ($1, 'Group E (Ăn xong)', 'served', 470000) RETURNING id`,
-      [tables[4].id]
+      `INSERT INTO orders (table_id, user_id, customer_name, status, total_amount) VALUES ($1, $2, 'Group E (Ăn xong)', 'served', 470000) RETURNING id`,
+      [tables[4].id, guests[0].id]
     );
     await client.query(
       `INSERT INTO order_items (order_id, menu_item_id, quantity, price_per_unit, total_price, status) VALUES ($1, $2, 2, 220000, 440000, 'served')`,
@@ -398,6 +386,13 @@ async function migrate() {
 
     console.log("🌱 Seeded 5 Active Scenarios (Pending -> Served)");
     console.log("🎉 MIGRATION & SEEDING COMPLETED SUCCESSFULLY!");
+    console.log("");
+    console.log("📋 Test Accounts:");
+    console.log("   Staff: admin@restaurant.com / 123456");
+    console.log("   Waiter: waiter@restaurant.com / 123456");
+    console.log("   Kitchen: kitchen@restaurant.com / 123456");
+    console.log("   Guest: guest1@example.com / 123456");
+    console.log("");
     process.exit(0);
   } catch (err) {
     console.error("❌ Migration failed:", err);
