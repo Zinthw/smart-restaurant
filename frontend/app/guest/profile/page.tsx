@@ -13,11 +13,25 @@ import {
   User,
   Loader2,
   Lock,
+  Pencil,
+  Camera,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BottomNavigation } from "@/components/guest/bottom-navigation";
-import { customerAPI } from "@/lib/api";
+import { customerAPI, API_BASE_URL } from "@/lib/api";
 import { useCart } from "@/lib/cart-context";
+
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input"; 
+import { Label } from "@/components/ui/label"; 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const tierBenefits = [
   { tier: "Bronze", points: 0, discount: "5%", freeItem: false },
@@ -31,13 +45,22 @@ export default function GuestProfilePage() {
   const { dispatch } = useCart();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerAvatar, setCustomerAvatar] = useState("");
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [currentTier, setCurrentTier] = useState("Bronze");
   const [nextTier, setNextTier] = useState<string | null>(null);
   const [pointsToNextTier, setPointsToNextTier] = useState(0);
+
+  const [isEditOpen, setIsEditOpen] = useState(false); // Bật tắt Modal
+  const [selectedFile, setSelectedFile] = useState<File | null>(null); // Lưu file ảnh gốc
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null); // Lưu link ảnh xem trước
+  const [editName, setEditName] = useState(""); // Lưu tên đang sửa
+  const [editPhone, setEditPhone] = useState(""); // Lưu số điện thoại đang sửa
+  const [isUpdating, setIsUpdating] = useState(false); // Loading khi đang update
 
   useEffect(() => {
     const token = localStorage.getItem("customerToken");
@@ -48,6 +71,8 @@ export default function GuestProfilePage() {
     }
 
     setIsLoggedIn(true);
+    fetchData();
+  }, []);
 
     // Fetch profile and points from API
     const fetchData = async () => {
@@ -60,21 +85,102 @@ export default function GuestProfilePage() {
         setCustomerName(profileData.full_name);
         setCustomerEmail(profileData.email);
         setCustomerPhone(profileData.phone);
+        setCustomerAvatar(profileData.avatar);
         setLoyaltyPoints(pointsData.totalPoints);
         setCurrentTier(pointsData.currentTier);
         setNextTier(pointsData.nextTier);
         setPointsToNextTier(pointsData.pointsToNextTier);
+        
+        // Update localStorage with fresh data
+        localStorage.setItem("customerName", profileData.full_name || "");
+        localStorage.setItem("customerInfo", JSON.stringify(profileData));
       } catch (error) {
         console.error("Failed to fetch profile:", error);
         // If API fails, use cached data
-        setCustomerName(localStorage.getItem("customerName") || "Khách hàng");
+        const cachedInfo = localStorage.getItem("customerInfo");
+        if (cachedInfo) {
+          try {
+            const info = JSON.parse(cachedInfo);
+            setCustomerName(info.full_name || "Khách hàng");
+            setCustomerEmail(info.email || "");
+            setCustomerPhone(info.phone || "");
+            setCustomerAvatar(info.avatar || "");
+          } catch (e) {
+            setCustomerName(localStorage.getItem("customerName") || "Khách hàng");
+          }
+        } else {
+          setCustomerName(localStorage.getItem("customerName") || "Khách hàng");
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchData();
-  }, []);
+  const handleUpdateProfile = async () => {
+    setIsUpdating(true);
+
+    try {
+      const token = localStorage.getItem("customerToken");
+      const formData = new FormData();
+      
+      // 1. Gom dữ liệu vào form
+      // Nếu người dùng không sửa tên/sđt, lấy giá trị cũ để gửi lên
+      formData.append("fullName", editName || customerName);
+      formData.append("phone", editPhone || customerPhone);
+      
+      // 2. Nếu có chọn ảnh thì gửi file
+      if (selectedFile) {
+        formData.append("avatar", selectedFile);
+      }
+
+      // 3. Gọi API
+      const res = await fetch(`${API_BASE_URL}/customer/profile`, {
+        method: "PUT",
+        headers: { 
+            Authorization: `Bearer ${token}` 
+        },
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Cập nhật thất bại");
+
+      const result = await res.json();
+
+      // 4. Thành công: Cập nhật state và localStorage
+      if (result.customer) {
+        setCustomerName(result.customer.full_name);
+        setCustomerPhone(result.customer.phone);
+        setCustomerAvatar(result.customer.avatar);
+        
+        // Cập nhật localStorage
+        localStorage.setItem("customerName", result.customer.full_name || "");
+        const cachedInfo = localStorage.getItem("customerInfo");
+        if (cachedInfo) {
+          const info = JSON.parse(cachedInfo);
+          const updatedInfo = {
+            ...info,
+            full_name: result.customer.full_name,
+            phone: result.customer.phone,
+            avatar: result.customer.avatar
+          };
+          localStorage.setItem("customerInfo", JSON.stringify(updatedInfo));
+        }
+      }
+      
+      // Reset form
+      setSelectedFile(null);
+      setPreviewUrl(null);
+      setIsEditOpen(false);
+      
+      alert("Cập nhật thành công!");
+      
+    } catch (error) {
+      console.error(error);
+      alert("Có lỗi xảy ra khi cập nhật!");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const handleLogout = () => {
     // Clear cart first
@@ -88,6 +194,20 @@ export default function GuestProfilePage() {
     localStorage.removeItem("cart"); // In case cart is persisted
 
     router.push("/guest/login");
+  };
+
+  // Helper để hiển thị avatar chính xác
+  const getDisplayAvatar = () => {
+    if (previewUrl) return previewUrl; // Ưu tiên ảnh vừa chọn
+    if (customerAvatar) {
+        // Nếu là ảnh Google (http...) thì dùng luôn
+        if (customerAvatar.startsWith('http')) return customerAvatar;
+        // Nếu là ảnh upload (/uploads...) thì thêm domain backend
+        // API_BASE_URL = http://localhost:4000/api, cần lấy base domain
+        const backendUrl = API_BASE_URL.replace('/api', '');
+        return `${backendUrl}${customerAvatar}`;
+    }
+    return "/default-avatar.png"; // Fallback
   };
 
   if (isLoading) {
@@ -140,16 +260,35 @@ export default function GuestProfilePage() {
 
       <main className="mx-auto max-w-lg p-4">
         {/* User Info Card */}
-        <div className="mb-4 rounded-lg border border-border bg-card p-4">
+        <div className="mb-4 rounded-lg border border-border bg-card p-4 relative">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="absolute top-2 right-2" // Căn góc phải
+          onClick={() => {
+              // Nạp dữ liệu hiện tại vào form trước khi mở
+              setEditName(customerName);
+              setEditPhone(customerPhone);
+              setIsEditOpen(true);
+          }}
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
           <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-              <User className="h-8 w-8 text-primary" />
-            </div>
+            <Avatar className="h-16 w-16">
+              <AvatarImage src={getDisplayAvatar()} alt={customerName} />
+              <AvatarFallback>
+                <User className="h-8 w-8" />
+              </AvatarFallback>
+            </Avatar>
             <div className="flex-1">
               <h2 className="text-lg font-bold text-card-foreground">
                 {customerName}
               </h2>
               <p className="text-sm text-muted-foreground">{customerEmail}</p>
+              {customerPhone && (
+                <p className="text-sm text-muted-foreground">{customerPhone}</p>
+              )}
             </div>
           </div>
         </div>
@@ -308,6 +447,70 @@ export default function GuestProfilePage() {
       </main>
 
       <BottomNavigation />
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle>Chỉnh sửa hồ sơ</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Chọn ảnh */}
+            <div className="flex flex-col items-center gap-4">
+                <Avatar className="h-24 w-24 cursor-pointer border-2 border-gray-200"
+                     onClick={() => document.getElementById('avatar-upload')?.click()}>
+                    <AvatarImage src={getDisplayAvatar()} alt="Avatar preview" />
+                    <AvatarFallback>
+                        <User className="h-12 w-12" />
+                    </AvatarFallback>
+                </Avatar>
+                <Button type="button" variant="outline" size="sm" onClick={() => document.getElementById('avatar-upload')?.click()}>
+                    <Camera className="h-4 w-4 mr-2" />
+                    Đổi ảnh đại diện
+                </Button>
+                <input 
+                    id="avatar-upload" 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden"
+                    onChange={(e) => {
+                        if (e.target.files?.[0]) {
+                            setSelectedFile(e.target.files[0]);
+                            setPreviewUrl(URL.createObjectURL(e.target.files[0]));
+                        }
+                    }} 
+                />
+            </div>
+
+            {/* Input Tên */}
+            <div className="space-y-2">
+                <Label>Họ và tên</Label>
+                <Input value={editName || ""} onChange={(e) => setEditName(e.target.value)} placeholder="Nhập tên hiển thị" />
+            </div>
+
+            {/* Input SĐT */}
+            <div className="space-y-2">
+                <Label>Số điện thoại</Label>
+                <Input value={editPhone || ""} onChange={(e) => setEditPhone(e.target.value)} placeholder="Nhập số điện thoại" />
+            </div>
+
+            <Button 
+                onClick={handleUpdateProfile} 
+                disabled={isUpdating}
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white"
+            >
+                {isUpdating ? (
+                    <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Đang lưu...
+                    </>
+                ) : (
+                    "Lưu thay đổi"
+                )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

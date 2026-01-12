@@ -30,3 +30,6 @@ coverage/
 
 # Markdown docs (không push)
 *.md
+
+backend/public/uploads/*
+!backend/public/uploads/.gitkeep
