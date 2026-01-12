@@ -11,11 +11,11 @@ const {
   orderLimiter,
 } = require("./middleware/rateLimiter");
 
+const authRouter = require("./routes/auth"); 
 const tablesRouter = require("./routes/tables");
 const qrRouter = require("./routes/qr");
 const publicRouter = require("./routes/public");
 const errorHandler = require("./middleware/errorHandler");
-const authRouter = require("./routes/auth");
 const {
   requireAuth,
   requireRole,
@@ -36,9 +36,7 @@ const reviewsRouter = require("./routes/reviews");
 const usersRouter = require("./routes/users");
 
 // New routes
-const customerAuthRouter = require("./routes/customerAuth");
 const customerRouter = require("./routes/customer");
-const superadminRouter = require("./routes/superadmin");
 
 const app = express();
 const server = http.createServer(app);
@@ -76,7 +74,7 @@ app.get("/health", (req, res) => {
 });
 
 // Giúp truy cập ảnh qua link
-app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "../public/uploads")));
 
 // --- ROUTES ---
 app.use("/api/auth", authLimiter, authRouter);
@@ -91,25 +89,25 @@ app.use("/api/admin/tables", requireAuth, requireRole("admin"), qrRouter);
 app.use(
   "/api/admin/menu/categories",
   requireAuth,
-  requireRole(["admin", "super_admin"]),
+  requireRole(["admin"]),
   categoriesRouter
 );
 app.use(
   "/api/admin/menu/items",
   requireAuth,
-  requireRole(["admin", "super_admin"]),
+  requireRole(["admin"]),
   photosRouter
 );
 app.use(
   "/api/admin/menu/items",
   requireAuth,
-  requireRole(["admin", "super_admin"]),
+  requireRole(["admin"]),
   itemsRouter
 );
 app.use(
   "/api/admin/menu",
   requireAuth,
-  requireRole(["admin", "super_admin"]),
+  requireRole(["admin"]),
   modifiersRouter
 );
 
@@ -117,13 +115,14 @@ app.use(
 app.use(
   "/api/waiter",
   requireAuth,
-  requireRole(["waiter", "admin", "super_admin"]),
+  requireRole(["waiter", "admin"]),
+
   waiterRouter
 );
 app.use(
   "/api/kitchen",
   requireAuth,
-  requireRole(["kitchen", "admin", "super_admin"]),
+  requireRole(["kitchen", "admin"]),
   kitchenRouter
 );
 app.use("/api/admin/reports", requireAuth, requireRole("admin"), reportsRouter);
@@ -135,19 +134,8 @@ app.use("/api/menu", optionalCustomer, reviewsRouter); // Reviews (GET public, P
 app.use("/api/orders", orderLimiter, optionalCustomer, ordersRouter); // Attach customer if logged in
 app.use("/api/payment", optionalCustomer, paymentRouter);
 
-// Customer Auth Routes (public)
-app.use("/api/auth/customer", authLimiter, customerAuthRouter);
-
 // Customer Profile Routes (requires customer login)
-app.use("/api/customer", requireCustomer, customerRouter);
-
-// Super Admin Routes
-app.use(
-  "/api/superadmin",
-  requireAuth,
-  requireRole("super_admin"),
-  superadminRouter
-);
+app.use("/api/customer", customerRouter);
 
 app.use(errorHandler);
 

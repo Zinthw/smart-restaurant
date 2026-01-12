@@ -1,197 +1,160 @@
 const express = require("express");
 const db = require("../db");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const upload = require("../middleware/uploadMiddleware");
 
 const router = express.Router();
 
-// GET /api/customer/profile
+// Middleware verify token
+const verifyToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ message: "No token" });
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "secret");
+    
+    // Check active
+    const { rows } = await db.query("SELECT id, status FROM users WHERE id = $1", [decoded.userId]);
+    if (!rows[0] || rows[0].status !== 'active') {
+        return res.status(403).json({ message: "User invalid" });
+    }
+
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: "Invalid token" });
+  }
+};
+
+router.use(verifyToken);
+
+// 1. GET Profile
 router.get("/profile", async (req, res, next) => {
   try {
-    const customerId = req.customer.customerId;
-
     const { rows } = await db.query(
-      `SELECT id, full_name, phone, email, type, total_points, tier, created_at, updated_at 
-       FROM customers WHERE id = $1`,
-      [customerId]
+      `SELECT id, full_name, phone, email, role, avatar_url as avatar, created_at, total_points, tier 
+       FROM users WHERE id = $1`,
+      [req.user.userId]
     );
-
-    if (!rows[0]) {
-      return res.status(404).json({ message: "Customer not found" });
-    }
-
+    if (!rows[0]) return res.status(404).json({ message: "User not found" });
     res.json(rows[0]);
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
-// PUT /api/customer/profile
-router.put("/profile", async (req, res, next) => {
+// 2. PUT Profile (Có Upload Avatar)
+router.put("/profile", upload.single('avatar'), async (req, res, next) => {
   try {
-    const customerId = req.customer.customerId;
     const { fullName, phone } = req.body;
+    let avatarPath = null;
 
-    const { rows } = await db.query(
-      `UPDATE customers 
-       SET full_name = COALESCE($1, full_name), 
-           phone = COALESCE($2, phone),
-           updated_at = NOW()
-       WHERE id = $3 
-       RETURNING id, full_name, phone, email, total_points, tier`,
-      [fullName, phone, customerId]
-    );
-
-    if (!rows[0]) {
-      return res.status(404).json({ message: "Customer not found" });
+    // Nếu người dùng có gửi file ảnh mới
+    if (req.file) {
+        // Lưu đường dẫn tương đối để frontend dễ ghép URL
+        avatarPath = `/uploads/${req.file.filename}`;
     }
 
-    res.json({ message: "Profile updated", customer: rows[0] });
-  } catch (err) {
-    next(err);
-  }
+    // Câu lệnh SQL thông minh:
+    // - COALESCE($1, full_name): Nếu fullName gửi lên null/rỗng thì giữ nguyên cái cũ
+    // - COALESCE($3, avatar_url): Nếu không upload ảnh mới (avatarPath null) thì giữ ảnh cũ
+    const { rows } = await db.query(
+      `UPDATE users 
+       SET full_name = COALESCE(NULLIF($1, ''), full_name), 
+           phone = COALESCE(NULLIF($2, ''), phone),
+           avatar_url = COALESCE($3, avatar_url)
+       WHERE id = $4 
+       RETURNING id, full_name, phone, email, avatar_url as avatar`,
+      [fullName, phone, avatarPath, req.user.userId]
+    );
+
+    res.json({ message: "Cập nhật thành công", customer: rows[0] });
+  } catch (err) { next(err); }
 });
 
-// GET /api/customer/orders
+// 3. GET Orders
 router.get("/orders", async (req, res, next) => {
   try {
-    const customerId = req.customer.customerId;
-    const { page = 1, limit = 10 } = req.query;
-
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
     const { rows } = await db.query(
       `SELECT o.*, t.table_number,
-              json_agg(
-                json_build_object(
-                  'id', oi.id,
-                  'name', m.name,
-                  'quantity', oi.quantity,
-                  'price', oi.total_price
-                )
-              ) as items
+              json_agg(json_build_object(
+                  'name', m.name, 'quantity', oi.quantity, 'price', oi.total_price
+              )) as items
        FROM orders o
        LEFT JOIN tables t ON o.table_id = t.id
        LEFT JOIN order_items oi ON o.id = oi.order_id
        LEFT JOIN menu_items m ON oi.menu_item_id = m.id
-       WHERE o.customer_id = $1
+       WHERE o.user_id = $1
        GROUP BY o.id, t.table_number
        ORDER BY o.created_at DESC
        LIMIT $2 OFFSET $3`,
-      [customerId, limit, offset]
+      [req.user.userId, limit, offset]
     );
 
-    const countRes = await db.query(
-      "SELECT COUNT(*) FROM orders WHERE customer_id = $1",
-      [customerId]
-    );
+    const countRes = await db.query("SELECT COUNT(*) FROM orders WHERE user_id = $1", [req.user.userId]);
 
     res.json({
       orders: rows,
-      pagination: {
-        total: parseInt(countRes.rows[0].count),
-        page: parseInt(page),
-        limit: parseInt(limit),
-      },
+      pagination: { total: parseInt(countRes.rows[0].count), page, limit }
     });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
-// GET /api/customer/points
+// 4. GET Points (Mockup hoặc thật)
 router.get("/points", async (req, res, next) => {
-  try {
-    const customerId = req.customer.customerId;
+    // Nếu bạn đã chạy lệnh ALTER TABLE thêm cột total_points
+    try {
+        const { rows } = await db.query("SELECT total_points, tier FROM users WHERE id = $1", [req.user.userId]);
+        const points = rows[0]?.total_points || 0;
+        const tier = rows[0]?.tier || 'Bronze';
 
-    const { rows } = await db.query(
-      `SELECT total_points, tier FROM customers WHERE id = $1`,
-      [customerId]
-    );
+        const tierThresholds = {
+            Bronze: { next: "Silver", threshold: 1000 },
+            Silver: { next: "Gold", threshold: 5000 },
+            Gold: { next: "Platinum", threshold: 10000 },
+            Platinum: { next: null, threshold: null },
+        };
+        
+        // Fix lỗi chữ hoa/thường bằng cách chuẩn hóa key
+        const normalizeTier = tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
+        const currentTierData = tierThresholds[normalizeTier] || tierThresholds["Bronze"];
+        
+        const nextTier = currentTierData.next;
+        const pointsToNext = nextTier ? (currentTierData.threshold - points) : 0;
 
-    if (!rows[0]) {
-      return res.status(404).json({ message: "Customer not found" });
+        res.json({
+            totalPoints: points,
+            currentTier: tier,
+            nextTier,
+            pointsToNextTier: pointsToNext > 0 ? pointsToNext : 0,
+        });
+    } catch(err) {
+        next(err);
     }
-
-    // Tính tier tiếp theo và điểm cần thiết
-    const points = rows[0].total_points;
-    const tier = rows[0].tier;
-    let nextTier = null;
-    let pointsToNext = 0;
-
-    const tierThresholds = {
-      bronze: { next: "silver", threshold: 200 },
-      silver: { next: "gold", threshold: 500 },
-      gold: { next: "platinum", threshold: 1000 },
-      platinum: { next: null, threshold: null },
-    };
-
-    if (tierThresholds[tier].next) {
-      nextTier = tierThresholds[tier].next;
-      pointsToNext = tierThresholds[tier].threshold - points;
-    }
-
-    res.json({
-      totalPoints: points,
-      currentTier: tier,
-      nextTier,
-      pointsToNextTier: pointsToNext > 0 ? pointsToNext : 0,
-    });
-  } catch (err) {
-    next(err);
-  }
 });
 
-// PUT /api/customer/change-password
+// 5. Change Password
 router.put("/change-password", async (req, res, next) => {
   try {
-    const customerId = req.customer.customerId;
     const { currentPassword, newPassword } = req.body;
+    if (newPassword.length < 6) return res.status(400).json({ message: "Mật khẩu mới quá ngắn" });
 
-    // Validate input
-    if (!currentPassword || !newPassword) {
-      return res
-        .status(400)
-        .json({ message: "Mật khẩu hiện tại và mật khẩu mới là bắt buộc" });
-    }
+    const { rows } = await db.query("SELECT password_hash, auth_provider FROM users WHERE id = $1", [req.user.userId]);
+    
+    if (rows[0].auth_provider === 'google') return res.status(400).json({ message: "Tài khoản Google không thể đổi mật khẩu." });
 
-    if (newPassword.length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Mật khẩu mới phải có ít nhất 6 ký tự" });
-    }
+    const match = await bcrypt.compare(currentPassword, rows[0].password_hash);
+    if (!match) return res.status(401).json({ message: "Mật khẩu cũ không đúng" });
 
-    // Get current password hash
-    const { rows } = await db.query(
-      "SELECT password_hash FROM customers WHERE id = $1",
-      [customerId]
-    );
-
-    if (!rows[0]) {
-      return res.status(404).json({ message: "Không tìm thấy tài khoản" });
-    }
-
-    // Verify current password
-    const isValidPassword = await bcrypt.compare(
-      currentPassword,
-      rows[0].password_hash
-    );
-    if (!isValidPassword) {
-      return res.status(401).json({ message: "Mật khẩu hiện tại không đúng" });
-    }
-
-    // Hash new password
-    const newPasswordHash = await bcrypt.hash(newPassword, 10);
-
-    // Update password
-    await db.query(
-      "UPDATE customers SET password_hash = $1, updated_at = NOW() WHERE id = $2",
-      [newPasswordHash, customerId]
-    );
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await db.query("UPDATE users SET password_hash = $1 WHERE id = $2", [newHash, req.user.userId]);
 
     res.json({ message: "Đổi mật khẩu thành công" });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
@@ -12,9 +12,6 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { customerAuthAPI, API_BASE_URL } from "@/lib/api";
 import { useCart } from "@/lib/cart-context";
-
-// Google Client ID
-const GOOGLE_CLIENT_ID = "894854335480-is551t3h3cgmbjdk7ls94hsvh4rhdanc.apps.googleusercontent.com";
 
 declare global {
   interface Window {
@@ -41,37 +38,52 @@ export default function GuestLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState("");
+  const googleButtonRef = useRef<HTMLDivElement>(null);
 
   // Set mounted state on client
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Load Google Sign-In Script
+  // Load Google Script & Render Button
   useEffect(() => {
-    if (!mounted) return;
-    
+    const initializeGoogleSignIn = () => {
+      if (!window.google || !googleButtonRef.current) return;
+
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
+      if (!clientId) {
+        console.error("Thiếu Google Client ID trong .env.local");
+        return;
+      }
+
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleGoogleCallback,
+      });
+
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: "outline",
+        size: "large",
+        width: "100%", 
+        text: "signin_with",
+        shape: "rectangular",
+      });
+    };
+
     const script = document.createElement("script");
     script.src = "https://accounts.google.com/gsi/client";
     script.async = true;
     script.defer = true;
+    script.onload = initializeGoogleSignIn;
     document.body.appendChild(script);
-
-    script.onload = () => {
-      if (window.google) {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: handleGoogleCallback,
-        });
-      }
-    };
 
     return () => {
       if (document.body.contains(script)) {
         document.body.removeChild(script);
       }
     };
-  }, [mounted]);
+  }, []);
 
   // Handle Google Sign-In callback
   const handleGoogleCallback = async (response: any) => {
@@ -79,24 +91,31 @@ export default function GuestLoginPage() {
     setError("");
     
     try {
+      localStorage.removeItem("admin_token");
+      localStorage.removeItem("kitchenToken");
+      localStorage.removeItem("waiterToken");
+      localStorage.removeItem("token");
+
       dispatch({ type: "CLEAR_CART" });
-      
-      const res = await fetch(`${API_BASE_URL}/auth/customer/google`, {
+
+      const idToken = response.credential;
+
+      const res = await fetch(`${API_BASE_URL}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken: response.credential }),
+        body: JSON.stringify({ idToken }),
       });
       
       const data = await res.json();
       
-      if (!res.ok) {
-        throw new Error(data.message || "Google login failed");
-      }
+      const token = data.accessToken || data.token;
+      localStorage.setItem("token", token);
+      localStorage.setItem("customerToken", token);
       
-      localStorage.setItem("customerToken", data.token || data.accessToken);
-      localStorage.setItem("customerName", data.customer.fullName || data.customer.email);
-      localStorage.setItem("customerId", data.customer.id);
-      localStorage.setItem("customerInfo", JSON.stringify(data.customer));
+      if (data.user) {
+        localStorage.setItem("customerName", data.user.full_name || data.user.name);
+        localStorage.setItem("customerInfo", JSON.stringify(data.user));
+      }
       
       router.push("/menu/guest");
     } catch (err: any) {
@@ -134,15 +153,6 @@ export default function GuestLoginPage() {
       );
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = () => {
-    // Trigger Google Sign-In popup
-    if (window.google) {
-      window.google.accounts.id.prompt();
-    } else {
-      setError("Google Sign-In chưa sẵn sàng. Vui lòng thử lại.");
     }
   };
 
@@ -259,40 +269,9 @@ export default function GuestLoginPage() {
           </div>
         </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full bg-transparent"
-          size="lg"
-          onClick={handleGoogleLogin}
-          disabled={isGoogleLoading}
-        >
-          {isGoogleLoading ? (
-            "Đang xử lý..."
-          ) : (
-            <>
-              <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              Đăng nhập với Google
-            </>
-          )}
-        </Button>
+        <div className="w-full flex justify-center min-h-[40px]">
+           <div ref={googleButtonRef} className="w-full"></div>
+        </div>
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Chưa có tài khoản?{" "}

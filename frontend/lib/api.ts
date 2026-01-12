@@ -35,10 +35,25 @@ async function fetchAPI<T>(
   // Add auth token if available (check all token types)
   if (typeof window !== "undefined") {
     const adminToken = localStorage.getItem("admin_token");
-    const customerToken = localStorage.getItem("customerToken");
     const kitchenToken = localStorage.getItem("kitchenToken");
     const waiterToken = localStorage.getItem("waiterToken");
-    const token = adminToken || kitchenToken || waiterToken || customerToken;
+    const customerToken = localStorage.getItem("customerToken");
+
+    let token = "";
+
+    // Nếu endpoint bắt đầu bằng /customer hoặc /auth/customer -> Ưu tiên token khách
+    if (endpoint.startsWith("/customer") || endpoint.startsWith("/auth/customer")) {
+        token = customerToken || "";
+    } 
+    // Nếu endpoint bắt đầu bằng /admin -> Ưu tiên token admin
+    else if (endpoint.startsWith("/admin")) {
+        token = adminToken || "";
+    }
+    // Các trường hợp còn lại (như /auth/google, /orders...), lấy theo thứ tự ưu tiên hoặc token chung
+    else {
+        // Fallback: Lấy token nào đang có (ưu tiên customer nếu đang ở trang guest)
+        token = customerToken || adminToken || kitchenToken || waiterToken || "";
+    }
 
     if (token) {
       defaultHeaders["Authorization"] = `Bearer ${token}`;

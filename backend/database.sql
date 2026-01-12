@@ -2,6 +2,18 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- 2. Xóa bảng cũ nếu tồn tại ....
+DROP TABLE IF EXISTS item_reviews CASCADE;
+DROP TABLE IF EXISTS order_items CASCADE;
+DROP TABLE IF EXISTS orders CASCADE;
+DROP TABLE IF EXISTS menu_item_modifier_groups CASCADE;
+DROP TABLE IF EXISTS modifier_options CASCADE;
+DROP TABLE IF EXISTS modifier_groups CASCADE;
+DROP TABLE IF EXISTS menu_item_photos CASCADE;
+DROP TABLE IF EXISTS menu_items CASCADE;
+DROP TABLE IF EXISTS menu_categories CASCADE;
+DROP TABLE IF EXISTS tables CASCADE;
+DROP TABLE IF EXISTS customers CASCADE; -- XÓA BỎ BẢNG NÀY
+DROP TABLE IF EXISTS users CASCADE;
 
 -- 3. Tạo bảng
       CREATE TABLE IF NOT EXISTS users (
@@ -12,12 +24,19 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
         phone VARCHAR(20),
         avatar_url TEXT,
         role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'staff', 'waiter', 'kitchen', 'guest')),
-        status VARCHAR(20) DEFAULT 'inactive' CHECK (status IN ('active', 'inactive', 'banned')),
+        status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'banned')),
+        
+        -- Các cột phục vụ Google Login & Khách hàng
         auth_provider VARCHAR(20) DEFAULT 'local',
         google_id VARCHAR(255),
+        total_points INT DEFAULT 0,
+        tier VARCHAR(50) DEFAULT 'Bronze',
+        
+        -- Token khôi phục mật khẩu
         verification_token VARCHAR(255),
         reset_password_token VARCHAR(255),
         reset_password_expires TIMESTAMP,
+        
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     
