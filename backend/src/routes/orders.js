@@ -98,11 +98,11 @@ router.post("/", async (req, res, next) => {
     }
 
     const orderRes = await client.query(
-      `INSERT INTO orders (table_id, customer_id, customer_name, total_amount, notes, status) 
+      `INSERT INTO orders (table_id, user_id, customer_name, total_amount, notes, status) 
          VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING id, created_at`,
       [
         table_id,
-        req.customer?.customerId || null, // Customer ID from optionalCustomer middleware
+        req.customer?.userId || null, // User ID from optionalCustomer middleware
         customer_name || "Guest",
         grandTotal,
         notes,
@@ -327,11 +327,11 @@ router.patch("/:id/attach-customer", async (req, res, next) => {
     const { id } = req.params;
 
     // Kiểm tra customer đã login chưa (từ header Authorization)
-    if (!req.customer || !req.customer.customerId) {
+    if (!req.customer || !req.customer.userId) {
       return res.status(401).json({ message: "Customer login required" });
     }
 
-    const customerId = req.customer.customerId;
+    const userId = req.customer.userId;
 
     // Kiểm tra order tồn tại và chưa thanh toán
     const orderCheck = await db.query(
@@ -348,7 +348,7 @@ router.patch("/:id/attach-customer", async (req, res, next) => {
     const order = orderCheck.rows[0];
 
     // Nếu order đã có customer khác thì không cho gắn
-    if (order.customer_id && order.customer_id !== customerId) {
+    if (order.user_id && order.user_id !== userId) {
       return res
         .status(400)
         .json({ message: "Order already assigned to another customer" });
@@ -357,10 +357,10 @@ router.patch("/:id/attach-customer", async (req, res, next) => {
     // Gắn customer vào order
     const { rows } = await db.query(
       `UPDATE orders 
-             SET customer_id = $1, updated_at = NOW()
+             SET user_id = $1, updated_at = NOW()
              WHERE id = $2
              RETURNING *`,
-      [customerId, id]
+      [userId, id]
     );
 
     res.json({

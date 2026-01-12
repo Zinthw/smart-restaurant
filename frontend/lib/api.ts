@@ -71,6 +71,31 @@ async function fetchAPI<T>(
   const response = await fetch(url, config);
 
   if (!response.ok) {
+    // Handle Unauthorized (401) or Forbidden (403 - Invalid Token)
+    if (response.status === 401 || response.status === 403) {
+      if (typeof window !== "undefined") {
+        // Clear all tokens
+        localStorage.removeItem("admin_token");
+        localStorage.removeItem("staffToken");
+        localStorage.removeItem("kitchenToken");
+        localStorage.removeItem("waiterToken");
+        localStorage.removeItem("customerToken");
+
+        // Redirect to login based on current path
+        const currentPath = window.location.pathname;
+        if (currentPath.startsWith("/admin")) {
+           // Avoid infinite loop if already at login
+           if (!currentPath.includes("/login")) {
+             window.location.href = "/admin/login";
+           }
+        } else {
+           if (!currentPath.includes("/guest/login")) {
+             window.location.href = "/guest/login";
+           }
+        }
+      }
+    }
+
     const error = await response
       .json()
       .catch(() => ({ message: "Network error" }));
@@ -114,26 +139,45 @@ export const authAPI = {
 // ==================== CUSTOMER AUTH API ====================
 
 export const customerAuthAPI = {
-  // Customer login with email or phone
+  // Customer login - dùng chung endpoint /auth/login với role guest
   login: (phoneOrEmail: string, password: string) =>
-    fetchAPI<{ token: string; accessToken: string; customer: any }>(
-      "/auth/customer/login",
+    fetchAPI<{ message: string; token: string; user: any }>(
+      "/auth/login",
       {
         method: "POST",
-        body: JSON.stringify({ phoneOrEmail, password }),
+        body: JSON.stringify({ email: phoneOrEmail, password }),
       }
     ),
 
-  // Customer register
+  // Customer register - dùng endpoint /auth/guest/register
   register: (data: {
     fullName: string;
     phone?: string;
     email: string;
     password: string;
   }) =>
-    fetchAPI<{ message: string; customer: any }>("/auth/customer/register", {
+    fetchAPI<{ message: string }>("/auth/guest/register", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        full_name: data.fullName,
+        phone: data.phone,
+        email: data.email,
+        password: data.password,
+      }),
+    }),
+
+  // Forgot password - dùng endpoint chung
+  forgotPassword: (email: string) =>
+    fetchAPI<{ message: string }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  // Reset password - dùng endpoint chung
+  resetPassword: (token: string, newPassword: string) =>
+    fetchAPI<{ message: string }>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, newPassword }),
     }),
 
   // Send OTP for verification

@@ -92,7 +92,9 @@ export default function ActiveOrdersPage() {
       // Nếu chưa đăng nhập, lấy đơn hàng theo bàn
       else if (tableId) {
         const tableOrders = await orderAPI.getTableOrders(tableId);
-        data = (tableOrders || []).filter(
+        // API trả về array trực tiếp hoặc { data: [] }
+        const ordersArray = Array.isArray(tableOrders) ? tableOrders : (tableOrders.data || []);
+        data = ordersArray.filter(
           (order: any) => order.status !== "paid"
         );
       }
