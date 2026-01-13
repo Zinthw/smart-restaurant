@@ -21,14 +21,12 @@ export default function GuestRegisterPage() {
     password: "",
   })
   const [showPassword, setShowPassword] = useState(false)
-  const [acceptTerms, setAcceptTerms] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!acceptTerms) return
 
     setIsLoading(true)
     setError("")
@@ -141,7 +139,7 @@ export default function GuestRegisterPage() {
               </button>
             </div>
           </div>
-          <Button type="submit" className="w-full" size="lg" disabled={isLoading || !acceptTerms}>
+          <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
             {isLoading ? "Đang đăng ký..." : "Đăng ký"}
           </Button>
         </form>
