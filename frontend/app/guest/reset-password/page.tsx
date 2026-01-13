@@ -19,6 +19,21 @@ import { Label } from "@/components/ui/label";
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://192.168.1.3:4000/api";
 
+// Helper: Validate Password Strength
+function validatePassword(password: string) {
+  const checks = {
+    minLength: password.length >= 8,
+    hasUpperCase: /[A-Z]/.test(password),
+    hasLowerCase: /[a-z]/.test(password),
+    hasNumber: /\d/.test(password),
+    hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+  }
+  
+  const allValid = Object.values(checks).every(v => v)
+  
+  return { checks, allValid }
+}
+
 export default function ResetPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -31,6 +46,9 @@ export default function ResetPasswordPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+
+  const passwordValidation = validatePassword(password)
 
   useEffect(() => {
     if (!token) {
@@ -42,9 +60,9 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError("");
 
-    // Validate
-    if (password.length < 6) {
-      setError("Mật khẩu phải có ít nhất 6 ký tự");
+    // Validate password strength
+    if (!passwordValidation.allValid) {
+      setError("Mật khẩu chưa đủ mạnh. Vui lòng kiểm tra các yêu cầu bên dưới.");
       return;
     }
 
@@ -190,11 +208,11 @@ export default function ResetPasswordPage() {
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Ít nhất 6 ký tự"
+                placeholder="Nhập mật khẩu mạnh"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onFocus={() => setPasswordFocused(true)}
                 required
-                minLength={6}
               />
               <button
                 type="button"
@@ -208,6 +226,35 @@ export default function ResetPasswordPage() {
                 )}
               </button>
             </div>
+            
+            {/* Password Strength Indicator */}
+            {(passwordFocused || password) && (
+              <div className="mt-2 space-y-1 rounded-lg border bg-muted/50 p-3 text-xs">
+                <p className="font-medium text-foreground">Yêu cầu mật khẩu:</p>
+                <div className="space-y-1">
+                  <PasswordCheck 
+                    valid={passwordValidation.checks.minLength} 
+                    label="Ít nhất 8 ký tự" 
+                  />
+                  <PasswordCheck 
+                    valid={passwordValidation.checks.hasUpperCase} 
+                    label="Có chữ hoa (A-Z)" 
+                  />
+                  <PasswordCheck 
+                    valid={passwordValidation.checks.hasLowerCase} 
+                    label="Có chữ thường (a-z)" 
+                  />
+                  <PasswordCheck 
+                    valid={passwordValidation.checks.hasNumber} 
+                    label="Có số (0-9)" 
+                  />
+                  <PasswordCheck 
+                    valid={passwordValidation.checks.hasSpecialChar} 
+                    label="Có ký tự đặc biệt (!@#$...)" 
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -257,4 +304,20 @@ export default function ResetPasswordPage() {
       </main>
     </div>
   );
+}
+
+// Password Check Component
+function PasswordCheck({ valid, label }: { valid: boolean; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      {valid ? (
+        <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+      ) : (
+        <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
+      )}
+      <span className={valid ? "text-green-600" : "text-muted-foreground"}>
+        {label}
+      </span>
+    </div>
+  )
 }
