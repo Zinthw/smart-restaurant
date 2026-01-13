@@ -12,6 +12,47 @@ const router = express.Router();
 // Google OAuth Client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+// Helper: Validate Password Strength
+function validatePassword(password) {
+  const minLength = 8;
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+  
+  if (password.length < minLength) {
+    return { valid: false, message: `Mật khẩu phải có ít nhất ${minLength} ký tự` };
+  }
+  if (!hasUpperCase) {
+    return { valid: false, message: "Mật khẩu phải có ít nhất 1 chữ hoa" };
+  }
+  if (!hasLowerCase) {
+    return { valid: false, message: "Mật khẩu phải có ít nhất 1 chữ thường" };
+  }
+  if (!hasNumber) {
+    return { valid: false, message: "Mật khẩu phải có ít nhất 1 chữ số" };
+  }
+  if (!hasSpecialChar) {
+    return { valid: false, message: "Mật khẩu phải có ít nhất 1 ký tự đặc biệt (!@#$%^&*...)" };
+  }
+  
+  return { valid: true };
+}
+
+// Helper: Validate Full Name
+function validateFullName(name) {
+  if (!name || name.trim().length === 0) {
+    return { valid: false, message: "Họ và tên là bắt buộc" };
+  }
+  if (name.trim().length < 2) {
+    return { valid: false, message: "Họ và tên phải có ít nhất 2 ký tự" };
+  }
+  if (!/^[a-zA-ZÀ-ỹ\s]+$/.test(name)) {
+    return { valid: false, message: "Họ và tên chỉ được chứa chữ cái và khoảng trắng" };
+  }
+  return { valid: true };
+}
+
 // 1. REGISTER STAFF (ADMIN ONLY)
 router.post("/register", requireAuth, requireRole("admin"), async (req, res, next) => {
   try {
@@ -113,35 +154,115 @@ router.post("/guest/register", async (req, res, next) => {
   try {
     const { email, password, full_name, phone } = req.body;
 
-    if (!email || !password)
-      return res.status(400).json({ message: "Email and password are required" });
+    // Validation đầu vào
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email và mật khẩu là bắt buộc" });
+    }
 
-    // Check exist
+    // Validate tên
+    const nameValidation = validateFullName(full_name);
+    if (!nameValidation.valid) {
+      return res.status(400).json({ message: nameValidation.message });
+    }
+
+    // Validate độ mạnh mật khẩu
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ message: passwordValidation.message });
+    }
+
+    // Check email tồn tại
     const check = await db.query("SELECT 1 FROM users WHERE email = $1", [email]);
-    if (check.rowCount > 0)
-      return res.status(400).json({ message: "Email is already in use" });
+    if (check.rowCount > 0) {
+      return res.status(400).json({ message: "Email đã được sử dụng" });
+    }
 
     const hash = await bcrypt.hash(password, 10);
     const verifyToken = crypto.randomBytes(32).toString("hex");
 
     // Insert user với status 'inactive' và role 'guest'
-    await db.query(
+    const newUser = await db.query(
       `INSERT INTO users (email, password_hash, full_name, phone, role, status, auth_provider, verification_token) 
-       VALUES ($1, $2, $3, $4, 'guest', 'inactive', 'local', $5)`,
-      [email, hash, full_name, phone, verifyToken]
+       VALUES ($1, $2, $3, $4, 'guest', 'inactive', 'local', $5)
+       RETURNING id`,
+      [email, hash, full_name.trim(), phone, verifyToken]
     );
 
-    // Gửi email xác thực
-    const verifyUrl = `${process.env.CLIENT_BASE_URL}/verify-email?token=${verifyToken}`;
-    const message = `Welcome to Smart Restaurant!\n\nPlease click here to verify your email:\n${verifyUrl}`;
-    
-    await sendEmail(email, "Verify Your Email", message);
+    const newUserId = newUser.rows[0].id;
 
-    if (process.env.NODE_ENV !== 'production') {
-        console.log(`[DEV ONLY] Verify Token for ${email}: ${verifyToken}`);
+    // Gửi email xác thực
+    try {
+      const verifyUrl = `${process.env.CLIENT_BASE_URL}/guest/verify-email?token=${verifyToken}`;
+      const message = `Chào mừng bạn đến với Smart Restaurant!\n\nVui lòng click vào link dưới đây để xác thực tài khoản:\n${verifyUrl}\n\nLink này có hiệu lực trong 24 giờ.\n\nNếu bạn không đăng ký tài khoản này, vui lòng bỏ qua email này.`;
+      
+      await sendEmail(email, "Xác thực tài khoản - Smart Restaurant", message);
+
+      res.status(201).json({ 
+        message: "Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.",
+        email: email
+      });
+    } catch (emailError) {
+      console.error("❌ Lỗi gửi email:", emailError.message);
+    
+      // Rollback - xóa user vừa tạo
+      await db.query("DELETE FROM users WHERE id = $1", [newUserId]);
+
+      return res.status(500).json({ 
+        message: "Không thể gửi email xác thực. Vui lòng kiểm tra cấu hình email hoặc thử lại sau.",
+        error: process.env.NODE_ENV === 'development' ? emailError.message : undefined
+      });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 4. VERIFY EMAIL (XÁC THỰC TÀI KHOẢN)
+router.get("/verify-email", async (req, res, next) => {
+  try {
+    const { token } = req.query;
+
+    console.log("🔍 Verify email request - Token:", token?.substring(0, 10) + "...");
+
+    if (!token) {
+      return res.status(400).json({ message: "Token xác thực không hợp lệ" });
     }
 
-    res.status(201).json({ message: "Registration successful! Please check your email to verify account." });
+    // Tìm user với token và chưa verify
+    const result = await db.query(
+      "SELECT id, email, full_name, status FROM users WHERE verification_token = $1",
+      [token]
+    );
+
+    const user = result.rows[0];
+    console.log("📧 User found:", user ? `${user.email} (status: ${user.status})` : "Not found");
+
+    if (!user) {
+      return res.status(400).json({ 
+        message: "Token không hợp lệ hoặc đã hết hạn" 
+      });
+    }
+
+    if (user.status === 'active') {
+      return res.status(200).json({ 
+        message: "Tài khoản đã được xác thực trước đó",
+        alreadyVerified: true
+      });
+    }
+
+    // Cập nhật status thành active và xóa token
+    await db.query(
+      "UPDATE users SET status = 'active', verification_token = NULL WHERE id = $1",
+      [user.id]
+    );
+
+    res.status(200).json({ 
+      message: "Xác thực tài khoản thành công! Bạn có thể đăng nhập ngay.",
+      user: {
+        email: user.email,
+        full_name: user.full_name
+      }
+    });
   } catch (err) {
     next(err);
   }
@@ -210,7 +331,7 @@ router.post("/google", async (req, res, next) => {
         email: user.email,
         role: user.role,
         full_name: user.full_name,
-        avatar: user.avatar_url, // Map đúng cột avatar_url trong DB
+        avatar: user.avatar_url, 
       },
     });
   } catch (err) {
@@ -219,19 +340,31 @@ router.post("/google", async (req, res, next) => {
   }
 });
 
-// 6. FORGOT PASSWORD
+// 6. FORGOT PASSWORD (QUÊN MẬT KHẨU)
 router.post("/forgot-password", async (req, res, next) => {
   try {
     const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ message: "Vui lòng nhập email" });
+    }
+
     const { rows } = await db.query("SELECT * FROM users WHERE email = $1", [email]);
     const user = rows[0];
 
+    // Không tiết lộ thông tin user có tồn tại hay không (bảo mật)
     if (!user) {
-      return res.json({ message: "If the email exists, a reset link will be sent." });
+      return res.json({ 
+        message: "Nếu email tồn tại, link reset mật khẩu đã được gửi.",
+        success: true
+      });
     }
     
+    // Nếu user dùng Google OAuth
     if (user.auth_provider === 'google') {
-         return res.status(400).json({ message: "Please login with Google." });
+      return res.status(400).json({ 
+        message: "Tài khoản này đăng nhập bằng Google. Vui lòng đăng nhập bằng Google." 
+      });
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
@@ -243,28 +376,46 @@ router.post("/forgot-password", async (req, res, next) => {
       [resetTokenHash, expireTime, user.id]
     );
 
-    const resetUrl = `${process.env.CLIENT_BASE_URL}/reset-password?token=${resetToken}`;
-    const message = `You have requested to reset your password.\n\nPlease click the link below:\n${resetUrl}\n\nThis link expires in 1 hour.`;
+    try {
+      const resetUrl = `${process.env.CLIENT_BASE_URL}/guest/reset-password?token=${resetToken}`;
+      const message = `Bạn đã yêu cầu reset mật khẩu cho tài khoản Smart Restaurant.\n\nVui lòng click vào link dưới đây để tạo mật khẩu mới:\n${resetUrl}\n\nLink này có hiệu lực trong 1 giờ.\n\nNếu bạn không yêu cầu reset mật khẩu, vui lòng bỏ qua email này.`;
 
-    await sendEmail(user.email, "Password Reset - Smart Restaurant", message);
+      await sendEmail(user.email, "Reset mật khẩu - Smart Restaurant", message);
 
-    if (process.env.NODE_ENV !== "production") {
-      console.log(`[DEV ONLY] Reset Token for ${email}: ${resetToken}`);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`[DEV] Reset Token cho ${email}: ${resetToken}`);
+      }
+
+      res.json({ 
+        message: "Link reset mật khẩu đã được gửi đến email của bạn.",
+        success: true
+      });
+    } catch (emailError) {
+      console.error("❌ Lỗi gửi email reset:", emailError.message);
+      return res.status(500).json({ 
+        message: "Không thể gửi email. Vui lòng thử lại sau.",
+        error: process.env.NODE_ENV === 'development' ? emailError.message : undefined
+      });
     }
-
-    res.json({ message: "Reset email sent!" });
   } catch (err) {
     next(err);
   }
 });
 
-// 7. RESET PASSWORD
+// 7. RESET PASSWORD (TẠO MẬT KHẨU MỚI)
 router.post("/reset-password", async (req, res, next) => {
   try {
     const { token, newPassword } = req.body;
 
-    if (!token || !newPassword) return res.status(400).json({ message: "Invalid request" });
-    if (newPassword.length < 6) return res.status(400).json({ message: "Password must be at least 6 characters" });
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: "Thiếu thông tin token hoặc mật khẩu mới" });
+    }
+
+    // Validate độ mạnh mật khẩu mới
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({ message: passwordValidation.message });
+    }
 
     const resetTokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
@@ -276,7 +427,11 @@ router.post("/reset-password", async (req, res, next) => {
     );
 
     const user = rows[0];
-    if (!user) return res.status(400).json({ message: "Invalid or expired token" });
+    if (!user) {
+      return res.status(400).json({ 
+        message: "Link reset mật khẩu không hợp lệ hoặc đã hết hạn" 
+      });
+    }
 
     const newPassHash = await bcrypt.hash(newPassword, 10);
 
@@ -287,7 +442,10 @@ router.post("/reset-password", async (req, res, next) => {
       [newPassHash, user.id]
     );
 
-    res.json({ message: "Password reset successful! Please login." });
+    res.json({ 
+      message: "Reset mật khẩu thành công! Bạn có thể đăng nhập với mật khẩu mới.",
+      success: true
+    });
   } catch (err) {
     next(err);
   }
