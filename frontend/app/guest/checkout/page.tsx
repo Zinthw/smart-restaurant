@@ -23,6 +23,7 @@ export default function CheckoutPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
+  const [tableNumber, setTableNumber] = useState<string>("");
 
   useEffect(() => {
     // Get table ID from guest_table (saved when scanning QR)
@@ -31,6 +32,7 @@ export default function CheckoutPage() {
       try {
         const parsed = JSON.parse(guestTable);
         setTableId(parsed.tableId || null);
+        setTableNumber(parsed.tableNumber || parsed.tableId || "");
       } catch {
         // Fallback to old format
         setTableId(localStorage.getItem("tableId") || null);
@@ -59,17 +61,15 @@ export default function CheckoutPage() {
       setError("Không tìm thấy thông tin bàn. Vui lòng quét QR lại.");
       return;
     }
-    if (!customerToken && (!customerName || !customerPhone)) {
-      return;
-    }
-
+    // Remove validation for guest customers - they can order without filling info
+    
     setIsLoading(true);
     setError("");
 
     try {
       // Map cart items to API format
       const orderItems = state.items.map((item) => ({
-        menu_item_id: item.menuItem.id,
+        itemId: item.menuItem.id,
         quantity: item.quantity,
         modifiers: item.selectedModifiers.map((m) => ({
           id: m.id,
@@ -79,19 +79,18 @@ export default function CheckoutPage() {
         notes: item.notes || undefined,
       }));
 
-      // Call real API
+      // Call real API - name/phone are optional for walk-in guests
       const response = await orderAPI.createOrder({
-        table_id: tableId,
+        tableId: tableId,
         items: orderItems,
-        customer_name: customerName || undefined,
-        notes: notes || undefined,
+        customerId: customerToken || undefined,
       });
 
       // Clear cart
       dispatch({ type: "CLEAR_CART" });
 
       // Navigate to order detail
-      router.push(`/guest/orders/${response.order_id}`);
+      router.push(`/guest/orders/${response.data?.order_id || response.data?.id}`);
     } catch (err: any) {
       setError(err.message || "Đặt món thất bại. Vui lòng thử lại.");
     } finally {
@@ -149,43 +148,13 @@ export default function CheckoutPage() {
           </div>
           <div>
             <p className="font-medium text-card-foreground">
-              Bàn {tableId || "—"}
+              Bàn {tableNumber || tableId || "—"}
             </p>
             <p className="text-sm text-muted-foreground">Smart Restaurant</p>
           </div>
         </div>
 
-        {/* Customer Info (if not logged in) */}
-        {!customerToken && (
-          <div className="mb-4 rounded-lg border border-border bg-card p-4">
-            <h3 className="mb-4 font-semibold text-card-foreground">
-              Thông tin khách hàng
-            </h3>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Họ tên</Label>
-                <Input
-                  id="name"
-                  placeholder="Nhập họ tên"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Số điện thoại</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="Nhập số điện thoại"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Customer Info removed - walk-in guests don't need to fill */}
 
         {/* Loyalty Points (if logged in) */}
         {customerToken && (
@@ -283,9 +252,7 @@ export default function CheckoutPage() {
             className="w-full"
             size="lg"
             onClick={handlePlaceOrder}
-            disabled={
-              isLoading || (!customerToken && (!customerName || !customerPhone))
-            }
+            disabled={isLoading}
           >
             {isLoading ? "Đang đặt món..." : "Đặt món"}
           </Button>

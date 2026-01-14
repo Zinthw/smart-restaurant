@@ -28,6 +28,8 @@ export default function GuestMenuPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [tableNumber, setTableNumber] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   const { dispatch } = useCart();
 
@@ -65,19 +67,35 @@ export default function GuestMenuPage() {
       // Fetch menu items
       const itemsRes = await menuAPI.getItems();
       if (itemsRes.data && itemsRes.data.length > 0) {
-        const apiItems: MenuItem[] = itemsRes.data.map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          description: item.description || "",
-          price: item.price,
-          image: getImageUrl(item.primary_photo),
-          category: item.category_id || item.category,
-          rating: item.rating || 4.5,
-          reviews: item.reviews || 0,
-          isAvailable:
-            item.is_available !== false && item.status !== "sold_out",
-          modifiers: item.modifiers || [],
-        }));
+        const apiItems: MenuItem[] = itemsRes.data.map((item: any) => {
+          const mappedItem = {
+            id: item.id,
+            name: item.name,
+            description: item.description || "",
+            price: item.price,
+            image: getImageUrl(item.primary_photo),
+            category: item.category_id || item.category,
+            rating: item.rating || 4.5,
+            reviews: item.reviews || 0,
+            isAvailable:
+              item.is_available !== false && item.status !== "sold_out",
+            modifiers: (item.modifiers || []).map((mod: any) => ({
+              ...mod,
+              multiple: mod.selection_type === 'multiple',
+              required: mod.is_required || false,
+              options: (mod.options || []).map((opt: any) => ({
+                ...opt,
+                price: opt.price_adjustment || opt.price || 0
+              }))
+            })),
+          };
+          // Debug log for first item with modifiers
+          if (mappedItem.modifiers && mappedItem.modifiers.length > 0 && itemsRes.data.indexOf(item) === 0) {
+            console.log('First item with modifiers:', mappedItem.name);
+            console.log('Modifiers:', JSON.stringify(mappedItem.modifiers, null, 2));
+          }
+          return mappedItem;
+        });
         setMenuItems(apiItems);
       }
     } catch (err: any) {
@@ -94,16 +112,56 @@ export default function GuestMenuPage() {
     fetchData();
   }, []);
 
+  // Reset page when search or category changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeCategory]);
+
+  // Simple fuzzy search function
+  const fuzzyMatch = (text: string, query: string): boolean => {
+    if (!query) return true;
+    const textLower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+    const queryLower = query.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, "");
+    
+    // Exact match
+    if (textLower.includes(queryLower)) return true;
+    
+    // Fuzzy match: allow 1-2 character differences
+    const words = queryLower.split(/\s+/);
+    return words.every(word => {
+      if (word.length <= 2) return textLower.includes(word);
+      
+      // Check if word appears with minor typos
+      for (let i = 0; i <= textLower.length - word.length; i++) {
+        const substr = textLower.substr(i, word.length);
+        let diff = 0;
+        for (let j = 0; j < word.length; j++) {
+          if (word[j] !== substr[j]) diff++;
+          if (diff > 1) break;
+        }
+        if (diff <= 1) return true;
+      }
+      return false;
+    });
+  };
+
   const filteredItems = useMemo(() => {
     return menuItems.filter((item) => {
-      const matchesSearch =
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = 
+        fuzzyMatch(item.name, searchQuery) ||
+        fuzzyMatch(item.description, searchQuery);
       const matchesCategory =
         activeCategory === "all" || item.category === activeCategory;
       return matchesSearch && matchesCategory;
     });
   }, [menuItems, searchQuery, activeCategory]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredItems.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredItems, currentPage]);
 
   const handleQuickAdd = (item: MenuItem) => {
     if (item.modifiers && item.modifiers.length > 0) {
@@ -119,6 +177,12 @@ export default function GuestMenuPage() {
           totalPrice: item.price,
         },
       });
+      // Show success notification with theme colors
+      const notification = document.createElement('div');
+      notification.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground px-8 py-3.5 rounded-lg shadow-lg z-50 font-medium min-w-[280px] text-center';
+      notification.textContent = `✓ Đã thêm ${item.name} vào giỏ hàng`;
+      document.body.appendChild(notification);
+      setTimeout(() => notification.remove(), 2000);
     }
   };
 
@@ -128,7 +192,15 @@ export default function GuestMenuPage() {
     modifiers: ModifierOption[],
     notes: string
   ) => {
-    const modifierTotal = modifiers.reduce((acc, mod) => acc + mod.price, 0);
+    const modifierTotal = modifiers.reduce((acc, mod) => {
+      const price = typeof mod.price === 'number' ? mod.price : parseFloat(mod.price || 0);
+      console.log('Modifier:', mod.name, 'Price:', mod.price, 'Parsed:', price);
+      return acc + (isNaN(price) ? 0 : price);
+    }, 0);
+    // Parse item.price to number to prevent string concatenation
+    const itemPrice = typeof item.price === 'number' ? item.price : parseFloat(item.price || 0);
+    const finalTotal = itemPrice + modifierTotal;
+    console.log('Item:', item.name, 'Base price:', item.price, 'Parsed base:', itemPrice, 'Modifier total:', modifierTotal, 'Final total:', finalTotal);
     dispatch({
       type: "ADD_ITEM",
       payload: {
@@ -136,7 +208,7 @@ export default function GuestMenuPage() {
         quantity,
         selectedModifiers: modifiers,
         notes,
-        totalPrice: item.price + modifierTotal,
+        totalPrice: finalTotal,
       },
     });
   };
@@ -180,19 +252,44 @@ export default function GuestMenuPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {filteredItems.map((item) => (
-              <MenuItemCard
-                key={item.id}
-                item={item}
-                onAddToCart={() => handleQuickAdd(item)}
-                onClick={() => {
-                  setSelectedItem(item);
-                  setIsDetailOpen(true);
-                }}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {paginatedItems.map((item) => (
+                <MenuItemCard
+                  key={item.id}
+                  item={item}
+                  onAddToCart={() => handleQuickAdd(item)}
+                  onClick={() => {
+                    setSelectedItem(item);
+                    setIsDetailOpen(true);
+                  }}
+                />
+              ))}
+            </div>
+            
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-6 flex items-center justify-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded border border-border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted"
+                >
+                  ← Trước
+                </button>
+                <span className="px-4 py-1 text-sm text-muted-foreground">
+                  Trang {currentPage} / {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded border border-border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted"
+                >
+                  Sau →
+                </button>
+              </div>
+            )}
+          </>
         )}
       </main>
 

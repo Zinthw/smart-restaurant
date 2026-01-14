@@ -72,9 +72,15 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <h4 className="font-medium text-card-foreground">{item.menuItem.name}</h4>
+                        <p className="text-xs text-muted-foreground">
+                          Giá gốc: {formatPrice(item.menuItem.price)}
+                        </p>
                         {item.selectedModifiers.length > 0 && (
                           <p className="text-xs text-muted-foreground">
-                            {item.selectedModifiers.map((m) => m.name).join(", ")}
+                            {item.selectedModifiers.map((m) => {
+                              const price = typeof m.price === 'number' ? m.price : parseFloat(m.price || 0);
+                              return `${m.name} (+${formatPrice(isNaN(price) ? 0 : price)})`;
+                            }).join(", ")}
                           </p>
                         )}
                         {item.notes && <p className="text-xs italic text-muted-foreground">{item.notes}</p>}
@@ -110,15 +116,16 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 rounded-full"
-                          onClick={() =>
+                          onClick={() => {
+                            console.log('Cart item:', item.menuItem.name, 'totalPrice:', item.totalPrice, 'quantity:', item.quantity, 'display:', item.totalPrice * item.quantity);
                             dispatch({
                               type: "UPDATE_QUANTITY",
                               payload: {
                                 id: item.id,
                                 quantity: item.quantity + 1,
                               },
-                            })
-                          }
+                            });
+                          }}
                         >
                           <Plus className="h-3 w-3" />
                         </Button>

@@ -47,6 +47,9 @@ router.get("/orders", customerController.getOrders);
 // GET /api/customer/points - Get loyalty points
 router.get("/points", customerController.getPoints);
 
+// GET /api/customer/ordered-items - Get list of items customer has ordered
+router.get("/ordered-items", customerController.getOrderedItems);
+
 // PUT /api/customer/change-password - Change password
 router.put("/change-password", customerController.changePassword);
 

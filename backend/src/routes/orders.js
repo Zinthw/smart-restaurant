@@ -26,4 +26,7 @@ router.patch("/:id/items", ordersController.addItems);
 // PATCH /api/orders/:id/attach-customer - Attach customer to order
 router.patch("/:id/attach-customer", ordersController.attachCustomer);
 
+// POST /api/orders/:id/request-bill - Request bill from waiter
+router.post("/:id/request-bill", ordersController.requestBill);
+
 module.exports = router;

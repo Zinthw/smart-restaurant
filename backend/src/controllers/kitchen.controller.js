@@ -24,13 +24,15 @@ exports.getOrders = async (req, res, next) => {
                  'notes', oi.notes,
                  'status', oi.status
                )
-             ) as items
+             ) FILTER (WHERE oi.status IN ('pending', 'preparing', 'ready')) as items
       FROM orders o
       JOIN tables t ON o.table_id = t.id
       JOIN order_items oi ON o.id = oi.order_id
       JOIN menu_items m ON oi.menu_item_id = m.id
-      WHERE o.status IN ('pending', 'accepted', 'preparing', 'ready') 
+      WHERE o.status NOT IN ('paid', 'cancelled')
+        AND oi.status IN ('pending', 'preparing', 'ready')
       GROUP BY o.id, t.table_number
+      HAVING COUNT(oi.id) FILTER (WHERE oi.status IN ('pending', 'preparing', 'ready')) > 0
       ORDER BY o.created_at ASC
     `);
     res.json(rows);

@@ -83,7 +83,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   })
 
   const itemCount = state.items.reduce((sum, item) => sum + item.quantity, 0)
-  const subtotal = state.items.reduce((sum, item) => sum + item.totalPrice * item.quantity, 0)
+  const subtotal = state.items.reduce((sum, item) => {
+    const price = typeof item.totalPrice === 'number' ? item.totalPrice : parseFloat(item.totalPrice || 0)
+    const qty = typeof item.quantity === 'number' ? item.quantity : parseInt(item.quantity || 0)
+    return sum + (isNaN(price) || isNaN(qty) ? 0 : price * qty)
+  }, 0)
 
   return <CartContext.Provider value={{ state, dispatch, itemCount, subtotal }}>{children}</CartContext.Provider>
 }

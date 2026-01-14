@@ -126,6 +126,28 @@ exports.getPoints = async (req, res, next) => {
 };
 
 /**
+ * GET /api/customer/ordered-items
+ * Get list of unique menu items that customer has ordered
+ */
+exports.getOrderedItems = async (req, res, next) => {
+  try {
+    const { rows } = await db.query(
+      `SELECT DISTINCT mi.id, mi.name 
+       FROM order_items oi
+       JOIN orders o ON oi.order_id = o.id
+       JOIN menu_items mi ON oi.menu_item_id = mi.id
+       WHERE o.user_id = $1 AND o.status IN ('paid', 'served')
+       ORDER BY mi.name`,
+      [req.user.userId]
+    );
+    
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * PUT /api/customer/change-password
  * Change customer password
  */

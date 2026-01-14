@@ -59,7 +59,7 @@ exports.processPayment = async (req, res, next) => {
         const { id } = req.params;
         const { method } = req.body; // 'cash', 'momo', 'zalopay', 'stripe'
 
-        // Update Order Status -> paid
+        // Update Order Status -> paid/completed
         const updateRes = await client.query(
             "UPDATE orders SET status = 'paid', paid_at = NOW() WHERE id = $1 RETURNING *",
             [id]
@@ -72,6 +72,14 @@ exports.processPayment = async (req, res, next) => {
 
         const order = updateRes.rows[0];
 
+        // Free up the table (set status to 'active' - empty/available)
+        if (order.table_id) {
+            await client.query(
+                "UPDATE tables SET status = 'active', updated_at = NOW() WHERE id = $1",
+                [order.table_id]
+            );
+        }
+
         await client.query('COMMIT');
 
         // Socket: Báo cho mọi người biết bàn này đã xong
@@ -79,6 +87,7 @@ exports.processPayment = async (req, res, next) => {
             const io = getIO();
             io.to(`table:${order.table_id}`).emit('order:paid', order);
             io.to('role:waiter').emit('order:paid', order);
+            io.to('role:admin').emit('table:freed', { tableId: order.table_id });
         } catch (e) {}
 
         res.json({ message: 'Payment successful', order });

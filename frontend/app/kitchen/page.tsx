@@ -26,10 +26,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { kitchenAPI } from "@/lib/api";
+import { formatPrice } from "@/lib/menu-data";
 import { useToast } from "@/hooks/use-toast";
 
 interface OrderItem {
-  id: number;
+  id: string;
   name: string;
   quantity: number;
   modifiers: any;
@@ -38,9 +39,9 @@ interface OrderItem {
 }
 
 interface KitchenOrder {
-  order_id: number;
-  table_id: number;
-  table_number: number;
+  order_id: string;
+  table_id: string;
+  table_number: string;
   order_status: string;
   created_at: string;
   customer_name?: string;
@@ -48,7 +49,7 @@ interface KitchenOrder {
 }
 
 const statusColumns = [
-  { key: "accepted", label: "Đơn mới", icon: Clock, color: "bg-warning" },
+  { key: "pending", label: "Chờ nấu", icon: Clock, color: "bg-warning" },
   { key: "preparing", label: "Đang nấu", icon: ChefHat, color: "bg-primary" },
   { key: "ready", label: "Sẵn sàng", icon: Bell, color: "bg-success" },
 ];
@@ -136,10 +137,10 @@ export default function KitchenDisplayPage() {
     return "text-muted-foreground";
   };
 
-  const handleAcceptOrder = async (orderId: number) => {
-    setProcessingOrder(orderId);
+  const handleAcceptOrder = async (orderId: string) => {
+    setProcessingOrder(Number(orderId));
     try {
-      await kitchenAPI.markPreparing(orderId.toString());
+      await kitchenAPI.markPreparing(orderId);
       await fetchOrders();
       toast({
         title: "Success",
@@ -156,10 +157,31 @@ export default function KitchenDisplayPage() {
     }
   };
 
-  const handleReadyOrder = async (orderId: number) => {
-    setProcessingOrder(orderId);
+  const handleItemStatusChange = async (itemId: string, newStatus: string) => {
     try {
-      await kitchenAPI.markReady(orderId.toString());
+      await kitchenAPI.updateItemStatus(itemId, newStatus);
+      await fetchOrders();
+      toast({
+        title: "Success",
+        description: `Item marked as ${newStatus}`,
+      });
+      // Play sound for ready status
+      if (newStatus === 'ready' && isSoundEnabled) {
+        // Would play notification sound in production
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update item",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReadyOrder = async (orderId: string) => {
+    setProcessingOrder(Number(orderId));
+    try {
+      await kitchenAPI.markReady(orderId);
       await fetchOrders();
       toast({
         title: "Success",
@@ -200,7 +222,21 @@ export default function KitchenDisplayPage() {
   };
 
   const getOrdersByStatus = (status: string) => {
-    return orders.filter((order) => order.order_status === status);
+    // Flatten items from all orders and filter by item status
+    const allItems: Array<OrderItem & { order_id: string; table_number: string; created_at: string }> = [];
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        if (item.status === status) {
+          allItems.push({
+            ...item,
+            order_id: order.order_id,
+            table_number: order.table_number,
+            created_at: order.created_at
+          });
+        }
+      });
+    });
+    return allItems;
   };
 
   if (isAuthChecking) {
@@ -314,107 +350,87 @@ export default function KitchenDisplayPage() {
               <div className="flex-1 space-y-3 overflow-y-auto p-3">
                 {columnOrders.length === 0 ? (
                   <div className="py-8 text-center text-muted-foreground">
-                    <p>No orders</p>
+                    <p>Không có món</p>
                   </div>
                 ) : (
-                  columnOrders.map((order) => (
+                  columnOrders.map((item, index) => (
                     <div
-                      key={order.order_id}
+                      key={`${item.order_id}-${item.id}-${index}`}
                       className="rounded-lg border border-border bg-background p-3"
                     >
-                      {/* Order Header */}
+                      {/* Item Header */}
                       <div className="mb-3 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm font-bold text-card-foreground">
-                            #{order.order_id}
+                          <span className="font-mono text-xs text-muted-foreground">
+                            #{item.order_id.slice(-6)}
                           </span>
-                          <Badge variant="outline">T{order.table_number}</Badge>
+                          <Badge variant="outline">{item.table_number}</Badge>
                         </div>
                         <div
                           className={`flex items-center gap-1 text-sm font-mono ${getTimeColor(
-                            order.created_at
+                            item.created_at
                           )}`}
                         >
                           <Clock className="h-3 w-3" />
-                          {getElapsedTime(order.created_at)}
+                          {getElapsedTime(item.created_at)}
                         </div>
                       </div>
 
-                      {/* Order Items */}
-                      <div className="mb-3 space-y-2">
-                        {order.items.map((item, index) => (
-                          <div key={index} className="rounded bg-muted p-2">
-                            <div className="flex justify-between">
-                              <span className="font-medium text-card-foreground">
-                                {item.quantity}x {item.name}
-                              </span>
-                            </div>
-                            {item.modifiers &&
-                              Object.keys(item.modifiers).length > 0 && (
-                                <p className="text-xs text-muted-foreground">
-                                  {typeof item.modifiers === "object"
-                                    ? Object.entries(item.modifiers)
-                                        .map(([key, val]) => `${key}: ${val}`)
-                                        .join(", ")
-                                    : String(item.modifiers)}
-                                </p>
-                              )}
-                            {item.notes && (
-                              <p className="text-xs italic text-primary">
-                                {item.notes}
-                              </p>
-                            )}
+                      {/* Item Details */}
+                      <div className="mb-3">
+                        <div className="rounded bg-muted p-3">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="font-semibold text-lg text-card-foreground">
+                              {item.quantity}x {item.name}
+                            </span>
                           </div>
-                        ))}
+                          {item.modifiers && (
+                            <div className="text-xs text-muted-foreground mt-2 space-y-1">
+                              {Array.isArray(item.modifiers) ? (
+                                item.modifiers.map((mod: any, idx: number) => (
+                                  <div key={idx}>• {mod.name} (+{formatPrice(mod.price || 0)})</div>
+                                ))
+                              ) : typeof item.modifiers === 'object' ? (
+                                Object.entries(item.modifiers).map(([key, val], idx) => (
+                                  <div key={idx}>• {key}: {String(val)}</div>
+                                ))
+                              ) : null}
+                            </div>
+                          )}
+                          {item.notes && (
+                            <p className="text-sm italic text-primary mt-2 font-medium">
+                              📝 {item.notes}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
                       {/* Actions */}
                       <div className="flex gap-2">
-                        {column.key === "accepted" && (
-                          <>
-                            <Button
-                              className="flex-1"
-                              size="sm"
-                              onClick={() => handleAcceptOrder(order.order_id)}
-                              disabled={processingOrder === order.order_id}
-                            >
-                              {processingOrder === order.order_id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                "Start Cooking"
-                              )}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-destructive bg-transparent"
-                              onClick={() => setRejectingOrder(order)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
+                        {column.key === "pending" && (
+                          <Button
+                            className="flex-1"
+                            size="sm"
+                            onClick={() => handleItemStatusChange(item.id, 'preparing')}
+                          >
+                            <ChefHat className="mr-1 h-4 w-4" />
+                            Bắt đầu nấu
+                          </Button>
                         )}
                         {column.key === "preparing" && (
                           <Button
                             className="flex-1 bg-success hover:bg-success/90"
                             size="sm"
-                            onClick={() => handleReadyOrder(order.order_id)}
-                            disabled={processingOrder === order.order_id}
+                            onClick={() => handleItemStatusChange(item.id, 'ready')}
                           >
-                            {processingOrder === order.order_id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <>
-                                <Bell className="mr-1 h-4 w-4" />
-                                Ready
-                              </>
-                            )}
+                            <Bell className="mr-1 h-4 w-4" />
+                            Sẵn sàng
                           </Button>
                         )}
                         {column.key === "ready" && (
                           <div className="flex-1 text-center">
-                            <p className="text-sm text-success">
-                              Waiting for pickup
+                            <p className="text-sm text-success font-medium">
+                              ✓ Chờ waiter mang ra
                             </p>
                           </div>
                         )}

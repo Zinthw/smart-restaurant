@@ -25,8 +25,13 @@ export function ItemDetailModal({ item, isOpen, onClose, onAddToCart }: ItemDeta
 
   if (!isOpen || !item) return null
 
-  const modifierTotal = selectedModifiers.reduce((sum, mod) => sum + mod.price, 0)
-  const totalPrice = (item.price + modifierTotal) * quantity
+  const modifierTotal = selectedModifiers.reduce((sum, mod) => {
+    const price = typeof mod.price === 'number' ? mod.price : parseFloat(mod.price || 0)
+    return sum + (isNaN(price) ? 0 : price)
+  }, 0)
+  
+  const itemPrice = typeof item.price === 'number' ? item.price : parseFloat(item.price || 0)
+  const totalPrice = (itemPrice + modifierTotal) * quantity
 
   const handleRadioChange = (modifierId: string, optionId: string) => {
     const modifier = item.modifiers?.find((m) => m.id === modifierId)
@@ -47,6 +52,12 @@ export function ItemDetailModal({ item, isOpen, onClose, onAddToCart }: ItemDeta
 
   const handleAddToCart = () => {
     onAddToCart(item, quantity, selectedModifiers, notes)
+    // Show success notification with theme colors
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground px-8 py-3.5 rounded-lg shadow-lg z-50 font-medium min-w-[300px] text-center';
+    notification.textContent = `✓ Đã thêm ${quantity}x ${item.name} vào giỏ hàng`;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 2000);
     setQuantity(1)
     setSelectedModifiers([])
     setNotes("")
@@ -100,8 +111,8 @@ export function ItemDetailModal({ item, isOpen, onClose, onAddToCart }: ItemDeta
                       />
                       <Label htmlFor={option.id} className="flex flex-1 cursor-pointer items-center justify-between">
                         <span>{option.name}</span>
-                        {option.price > 0 && (
-                          <span className="text-sm text-muted-foreground">+{formatPrice(option.price)}</span>
+                        {(option.price || 0) > 0 && (
+                          <span className="text-sm font-medium text-primary">+{formatPrice(option.price || 0)}</span>
                         )}
                       </Label>
                     </div>
@@ -113,8 +124,8 @@ export function ItemDetailModal({ item, isOpen, onClose, onAddToCart }: ItemDeta
                         <RadioGroupItem value={option.id} id={option.id} />
                         <Label htmlFor={option.id} className="flex flex-1 cursor-pointer items-center justify-between">
                           <span>{option.name}</span>
-                          {option.price > 0 && (
-                            <span className="text-sm text-muted-foreground">+{formatPrice(option.price)}</span>
+                          {(option.price || 0) > 0 && (
+                            <span className="text-sm font-medium text-primary">+{formatPrice(option.price || 0)}</span>
                           )}
                         </Label>
                       </div>

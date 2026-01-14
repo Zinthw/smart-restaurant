@@ -25,10 +25,10 @@ exports.getOrders = async (req, res, next) => {
       query += ` WHERE o.status = $1`;
       params.push(status);
     } else {
-      query += ` WHERE o.status NOT IN ('cancelled', 'paid')`;
+      query += ` WHERE o.status NOT IN ('cancelled')`;
     }
 
-    query += ` ORDER BY o.created_at ASC`;
+    query += ` ORDER BY o.created_at DESC`;
     const { rows } = await db.query(query, params);
     const ordersWithItems = await Promise.all(rows.map(async (order) => {
       const itemsRes = await db.query(`
@@ -111,4 +111,61 @@ exports.serveOrder = async (req, res, next) => {
     
     res.json({ message: 'Order served', order: rows[0] });
   } catch (err) { next(err); }
+};
+
+/**
+ * PATCH /api/waiter/items/:itemId/served
+ * Mark item as served
+ */
+exports.serveItem = async (req, res, next) => {
+  try {
+    const { itemId } = req.params;
+    const { rows } = await db.query(
+      "UPDATE order_items SET status = 'served' WHERE id = $1 RETURNING *",
+      [itemId]
+    );
+    if (rows.length === 0)
+      return res.status(404).json({ message: "Item not found" });
+
+    const item = rows[0];
+
+    // Socket: Báo khách món đã phục vụ
+    const io = getIO();
+    const orderRes = await db.query("SELECT table_id FROM orders WHERE id = $1", [item.order_id]);
+    if (orderRes.rowCount > 0) {
+      io.to(`table:${orderRes.rows[0].table_id}`).emit('item:served', {
+        orderId: item.order_id,
+        itemId: item.id,
+      });
+    }
+
+    res.json({ message: `Item marked as served`, item });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /api/waiter/items/ready
+ * Get all items that are ready to serve (status='ready')
+ */
+exports.getReadyItems = async (req, res, next) => {
+  try {
+    const { rows } = await db.query(`
+      SELECT oi.id as item_id, oi.quantity, oi.status, oi.notes,
+             mi.name as item_name,
+             o.id as order_id, t.table_number,
+             oi.modifiers_selected
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      JOIN tables t ON o.table_id = t.id
+      JOIN menu_items mi ON oi.menu_item_id = mi.id
+      WHERE oi.status = 'ready' 
+        AND o.status NOT IN ('paid', 'cancelled')
+      ORDER BY oi.created_at ASC
+    `);
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
 };

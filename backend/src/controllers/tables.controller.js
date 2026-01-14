@@ -106,7 +106,31 @@ exports.create = async (req, res, next) => {
       [table_number, capacity, location, description || null, status]
     );
 
-    res.status(201).json(insert.rows[0]);
+    const newTable = insert.rows[0];
+
+    // Auto-generate QR code for new table
+    if (status === 'active') {
+      const jwt = require("jsonwebtoken");
+      const payload = {
+        tableId: newTable.id,
+        restaurantId: "demo-restaurant",
+      };
+      const token = jwt.sign(
+        payload,
+        process.env.QR_JWT_SECRET || "qr_secret_key",
+        { expiresIn: "30d" }
+      );
+      
+      await db.query(
+        `UPDATE tables SET qr_token = $1, qr_token_created_at = NOW() WHERE id = $2`,
+        [token, newTable.id]
+      );
+      
+      newTable.qr_token = token;
+      newTable.qr_token_created_at = new Date().toISOString();
+    }
+
+    res.status(201).json(newTable);
   } catch (err) {
     next(err);
   }

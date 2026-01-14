@@ -15,6 +15,7 @@ import {
   Volume2,
   VolumeX,
   Key,
+  CreditCard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,7 +35,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatPrice } from "@/lib/menu-data";
+import { waiterAPI } from "@/lib/api";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://192.168.1.3:4000/api";
@@ -45,6 +48,7 @@ interface OrderItem {
   quantity: number;
   price_per_unit: string;
   total_price: string;
+  status?: "pending" | "preparing" | "ready" | "served";
 }
 
 interface WaiterOrder {
@@ -57,6 +61,15 @@ interface WaiterOrder {
   created_at: string;
   notes?: string;
   items: OrderItem[];
+}
+
+interface ReadyItem {
+  item_id: string;
+  item_name: string;
+  quantity: number;
+  table_number: string;
+  order_id: string;
+  notes?: string;
 }
 
 const statusConfig = {
@@ -95,6 +108,8 @@ const statusConfig = {
 export default function WaiterOrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<WaiterOrder[]>([]);
+  const [readyItems, setReadyItems] = useState<ReadyItem[]>([]);
+  const [activeTab, setActiveTab] = useState("orders");
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterTable, setFilterTable] = useState<string>("all");
@@ -125,6 +140,31 @@ export default function WaiterOrdersPage() {
     }
   }, []);
 
+  const fetchReadyItems = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("waiterToken");
+      if (!token) return;
+
+      const items = await waiterAPI.getReadyItems();
+      setReadyItems(items);
+    } catch (error) {
+      console.error("Error fetching ready items:", error);
+    }
+  }, []);
+
+  const handleServeItem = async (itemId: string) => {
+    try {
+      const token = localStorage.getItem("waiterToken");
+      if (!token) return;
+
+      await waiterAPI.serveItem(itemId);
+      fetchReadyItems(); // Refresh ready items
+    } catch (error: any) {
+      console.error("Error serving item:", error);
+      alert(error.message || "Có lỗi xảy ra");
+    }
+  };
+
   useEffect(() => {
     // Check auth
     const token = localStorage.getItem("waiterToken");
@@ -137,11 +177,15 @@ export default function WaiterOrdersPage() {
 
     if (name) setWaiterName(name);
     fetchOrders();
+    fetchReadyItems();
 
     // Poll for updates every 5 seconds
-    const interval = setInterval(fetchOrders, 5000);
+    const interval = setInterval(() => {
+      fetchOrders();
+      fetchReadyItems();
+    }, 5000);
     return () => clearInterval(interval);
-  }, [fetchOrders, router]);
+  }, [fetchOrders, fetchReadyItems, router]);
 
   const filteredOrders = orders.filter((order) => {
     const matchesStatus =
@@ -192,6 +236,33 @@ export default function WaiterOrdersPage() {
 
   const handleServeOrder = (orderId: string) => {
     updateOrderStatus(orderId, "served");
+  };
+
+  const handleMarkAsPaid = async (orderId: string) => {
+    try {
+      const token = localStorage.getItem("waiterToken");
+      const response = await fetch(
+        `${API_URL}/payment/orders/${orderId}/pay`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ method: "cash" }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || "Failed to mark as paid");
+      }
+
+      fetchOrders();
+    } catch (error: any) {
+      console.error("Error marking as paid:", error);
+      alert(error.message || "Có lỗi xảy ra");
+    }
   };
 
   const handleRejectOrder = () => {
@@ -256,43 +327,67 @@ export default function WaiterOrdersPage() {
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-2 border-t border-border px-4 py-2">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-          </div>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="h-8 w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              {Object.entries(statusConfig).map(([key, config]) => (
-                <SelectItem key={key} value={key}>
-                  {config.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={filterTable} onValueChange={setFilterTable}>
-            <SelectTrigger className="h-8 w-28">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Tables</SelectItem>
-              {uniqueTables.map((table) => (
-                <SelectItem key={table} value={table}>
-                  Table {table}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      {/* Filters */}
+      <div className="flex gap-2 border-t border-border px-4 py-2">
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
         </div>
-      </header>
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="h-8 w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            {Object.entries(statusConfig).map(([key, config]) => (
+              <SelectItem key={key} value={key}>
+                {config.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      {/* Orders List */}
-      <main className="p-4">
+        <Select value={filterTable} onValueChange={setFilterTable}>
+          <SelectTrigger className="h-8 w-28">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Tables</SelectItem>
+            {uniqueTables.map((table) => (
+              <SelectItem key={table} value={table}>
+                Table {table}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </header>
+
+    {/* Main Content with Tabs */}
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-card sticky top-[57px] z-40">
+        <TabsTrigger 
+          value="orders" 
+          className="relative rounded-none border-b-2 border-transparent px-6 py-3 font-semibold text-muted-foreground transition-all data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:shadow-sm"
+        >
+          <Clock className="mr-2 h-4 w-4" />
+          Đơn hàng
+        </TabsTrigger>
+        <TabsTrigger 
+          value="ready" 
+          className="relative rounded-none border-b-2 border-transparent px-6 py-3 font-semibold text-muted-foreground transition-all data-[state=active]:border-success data-[state=active]:text-success data-[state=active]:shadow-sm"
+        >
+          <Bell className="mr-2 h-4 w-4" />
+          Món sẵn sàng 
+          {readyItems.length > 0 && (
+            <span className="ml-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-success text-xs font-bold text-white">
+              {readyItems.length}
+            </span>
+          )}
+        </TabsTrigger>
+      </TabsList>
+
+      {/* Orders Tab */}
+      <TabsContent value="orders" className="p-4">
         {isLoading ? (
           <div className="py-24 text-center">
             <RefreshCw className="mx-auto mb-4 h-12 w-12 text-muted-foreground animate-spin" />
@@ -358,9 +453,14 @@ export default function WaiterOrdersPage() {
 
                     {/* Order Items */}
                     <div className="p-4">
-                      {order.customer_name && (
+                      {order.customer_name && order.customer_name !== "Guest" && (
                         <p className="mb-2 text-sm text-muted-foreground">
                           Khách: {order.customer_name}
+                        </p>
+                      )}
+                      {!order.customer_name || order.customer_name === "Guest" && (
+                        <p className="mb-2 text-sm text-muted-foreground italic">
+                          Khách vãng lai
                         </p>
                       )}
                       <div className="mb-3 space-y-2">
@@ -394,51 +494,42 @@ export default function WaiterOrdersPage() {
 
                         {/* Actions based on status */}
                         <div className="flex gap-2">
-                          {order.status === "pending" && (
-                            <>
-                              <Button
-                                size="sm"
-                                onClick={() => handleAcceptOrder(order.id)}
-                              >
-                                <CheckCircle className="mr-1 h-4 w-4" />
-                                Accept
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-destructive bg-transparent"
-                                onClick={() => setRejectingOrder(order)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-
-                          {order.status === "ready" && (
-                            <Button
-                              className="bg-success hover:bg-success/90"
-                              size="sm"
-                              onClick={() => handleServeOrder(order.id)}
-                            >
-                              <Sparkles className="mr-1 h-4 w-4" />
-                              Serve
-                            </Button>
-                          )}
-
-                          {(order.status === "accepted" ||
-                            order.status === "preparing") && (
-                            <Badge variant="outline">In Kitchen</Badge>
-                          )}
-
-                          {order.status === "served" && (
-                            <Badge variant="outline">Awaiting Payment</Badge>
-                          )}
-
-                          {order.status === "paid" && (
-                            <Badge className="bg-muted text-muted-foreground">
-                              Completed
-                            </Badge>
-                          )}
+                          {(() => {
+                            const allItemsServed = order.items.every(item => item.status === "served");
+                            const hasUnservedItems = order.items.some(item => item.status !== "served");
+                            
+                            if (order.status === "paid") {
+                              return (
+                                <Badge className="bg-muted text-muted-foreground">
+                                  Completed
+                                </Badge>
+                              );
+                            }
+                            
+                            if (allItemsServed && order.status !== "paid") {
+                              return (
+                                <>
+                                  <Badge className="bg-orange-100 text-orange-700 border-orange-300">
+                                    Chờ thanh toán
+                                  </Badge>
+                                  <Button
+                                    className="bg-green-600 hover:bg-green-700"
+                                    size="sm"
+                                    onClick={() => handleMarkAsPaid(order.id)}
+                                  >
+                                    <CreditCard className="mr-1 h-4 w-4" />
+                                    Thanh toán
+                                  </Button>
+                                </>
+                              );
+                            }
+                            
+                            if (hasUnservedItems) {
+                              return <Badge variant="outline">In Kitchen</Badge>;
+                            }
+                            
+                            return null;
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -448,7 +539,63 @@ export default function WaiterOrdersPage() {
             })}
           </div>
         )}
-      </main>
+      </TabsContent>
+
+      {/* Ready Items Tab */}
+      <TabsContent value="ready" className="p-4">
+        {readyItems.length === 0 ? (
+          <div className="py-24 text-center">
+            <Bell className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+            <h2 className="text-xl font-bold text-foreground">
+              Chưa có món sẵn sàng
+            </h2>
+            <p className="text-muted-foreground">
+              Các món đã nấu xong sẽ hiển thị ở đây
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {readyItems.map((item) => (
+              <Card key={item.item_id} className="overflow-hidden ring-2 ring-success">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
+                          <span className="font-bold text-success">
+                            {item.table_number}
+                          </span>
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-card-foreground">
+                            {item.item_name}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            Order #{item.order_id.slice(-6)} • x{item.quantity}
+                          </p>
+                        </div>
+                      </div>
+                      {item.notes && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          📝 {item.notes}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      className="bg-success hover:bg-success/90"
+                      onClick={() => handleServeItem(item.item_id)}
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Đã phục vụ
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </TabsContent>
+    </Tabs>
 
       {/* Reject Dialog */}
       <Dialog

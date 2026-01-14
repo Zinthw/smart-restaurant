@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { ArrowLeft, Clock, CheckCircle, ChefHat, Bell, Sparkles, CreditCard, Plus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { formatPrice } from "@/lib/menu-data"
 import { orderAPI } from "@/lib/api"
 
 interface Order {
   id: string
   table_id: string
+  table_number?: string
   status: "pending" | "accepted" | "preparing" | "ready" | "served" | "paid"
   total_amount: number
   created_at: string
@@ -18,10 +20,12 @@ interface Order {
   items: Array<{
     id: string
     item_name: string
+    item_image?: string
     quantity: number
     price_per_unit: number
     total_price: number
     modifiers_selected?: any
+    status?: "pending" | "preparing" | "ready" | "served"
   }>
 }
 
@@ -39,11 +43,13 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
   const router = useRouter()
   const [order, setOrder] = useState<Order | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [billRequested, setBillRequested] = useState(false)
+  const [isRequestingBill, setIsRequestingBill] = useState(false)
 
   const fetchOrder = async () => {
     try {
       const data = await orderAPI.getOrder(orderId)
-      setOrder(data as Order)
+      setOrder((data?.data || data) as Order)
     } catch (error) {
       console.error("Failed to fetch order:", error)
       setOrder(null)
@@ -62,6 +68,19 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
   const getCurrentStepIndex = () => {
     if (!order) return 0
     return statusSteps.findIndex((step) => step.key === order.status)
+  }
+
+  const handleRequestBill = async () => {
+    setIsRequestingBill(true)
+    try {
+      await orderAPI.requestBill(orderId)
+      setBillRequested(true)
+      alert("Yêu cầu thanh toán đã được gửi đến nhân viên!")
+    } catch (error: any) {
+      alert(error.message || "Không thể gửi yêu cầu. Vui lòng thử lại.")
+    } finally {
+      setIsRequestingBill(false)
+    }
   }
 
   if (!order) {
@@ -156,13 +175,46 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
           <div className="divide-y divide-border">
             {order.items.map((item, index) => (
               <div key={index} className="flex gap-3 p-4">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
-                  <span className="text-2xl">🍽️</span>
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg">
+                  {item.item_image ? (
+                    <Image
+                      src={item.item_image}
+                      alt={item.item_name}
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-muted">
+                      <span className="text-2xl">🍽️</span>
+                    </div>
+                  )}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-start justify-between">
-                    <div>
-                      <h4 className="font-medium text-card-foreground">{item.item_name}</h4>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium text-card-foreground">{item.item_name}</h4>
+                        {item.status && (
+                          <Badge 
+                            variant="outline" 
+                            className={
+                              item.status === "pending" ? "bg-yellow-50 text-yellow-700 border-yellow-300" :
+                              item.status === "preparing" ? "bg-blue-50 text-blue-700 border-blue-300" :
+                              item.status === "ready" ? "bg-green-50 text-green-700 border-green-300" :
+                              item.status === "served" ? "bg-gray-50 text-gray-700 border-gray-300" : ""
+                            }
+                          >
+                            {item.status === "pending" && <Clock className="mr-1 h-3 w-3" />}
+                            {item.status === "preparing" && <ChefHat className="mr-1 h-3 w-3" />}
+                            {item.status === "ready" && <Bell className="mr-1 h-3 w-3" />}
+                            {item.status === "served" && <Sparkles className="mr-1 h-3 w-3" />}
+                            {item.status === "pending" ? "Chờ" :
+                             item.status === "preparing" ? "Đang nấu" :
+                             item.status === "ready" ? "Sẵn sàng" :
+                             item.status === "served" ? "Đã phục vụ" : ""}
+                          </Badge>
+                        )}
+                      </div>
                       {item.modifiers_selected && (
                         <p className="text-xs text-muted-foreground">
                           {typeof item.modifiers_selected === 'string'
@@ -198,7 +250,7 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
           </div>
           <div className="flex justify-between py-1">
             <span className="text-muted-foreground">Bàn</span>
-            <span className="font-medium text-card-foreground">{order.table_id}</span>
+            <span className="font-medium text-card-foreground">{order.table_number || order.table_id}</span>
           </div>
           <div className="flex justify-between py-1">
             <span className="text-muted-foreground">Thời gian</span>
@@ -217,8 +269,39 @@ export default function OrderStatusPage({ params }: { params: Promise<{ orderId:
 
       {/* Fixed Bottom Action */}
       <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-card p-4">
-        <div className="mx-auto max-w-lg">
-          <Button className="w-full" size="lg" onClick={() => router.push("/menu/guest")}>
+        <div className="mx-auto max-w-lg space-y-2">
+          {order.status !== 'paid' && (
+            <Button 
+              className="w-full" 
+              size="lg" 
+              variant="default"
+              onClick={handleRequestBill}
+              disabled={isRequestingBill || billRequested}
+            >
+              {isRequestingBill ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang gửi yêu cầu...
+                </>
+              ) : billRequested ? (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Đã yêu cầu thanh toán
+                </>
+              ) : (
+                <>
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Yêu cầu thanh toán
+                </>
+              )}
+            </Button>
+          )}
+          <Button 
+            className="w-full" 
+            size="lg" 
+            variant="outline"
+            onClick={() => router.push("/menu/guest")}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Gọi thêm món
           </Button>

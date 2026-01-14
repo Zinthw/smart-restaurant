@@ -222,6 +222,10 @@ export const customerAPI = {
     fetchAPI<{ orders: any[]; pagination: any }>(
       `/customer/orders?page=${page}&limit=${limit}`
     ),
+
+  // Get list of items customer has ordered (for reviews)
+  getOrderedItems: () =>
+    fetchAPI<Array<{ id: string; name: string }>>("/customer/ordered-items"),
 };
 
 // ==================== MENU API ====================
@@ -282,6 +286,12 @@ export const orderAPI = {
     fetchAPI<{ data: any }>(`/orders/${orderId}/cancel`, {
       method: "POST",
     }),
+
+  // Request bill from waiter
+  requestBill: (orderId: string) =>
+    fetchAPI<{ message: string; order_id: string }>(`/orders/${orderId}/request-bill`, {
+      method: "POST",
+    }),
 };
 
 // ==================== KITCHEN API ====================
@@ -319,6 +329,9 @@ export const waiterAPI = {
     return fetchAPI<any[]>(`/waiter/orders${query}`);
   },
 
+  // Get items ready to serve
+  getReadyItems: () => fetchAPI<any[]>("/waiter/items/ready"),
+
   // Accept order
   acceptOrder: (orderId: string) =>
     fetchAPI<any>(`/waiter/orders/${orderId}/accept`, {
@@ -334,6 +347,12 @@ export const waiterAPI = {
   // Mark order as served
   serveOrder: (orderId: string) =>
     fetchAPI<any>(`/waiter/orders/${orderId}/served`, {
+      method: "PATCH",
+    }),
+
+  // Mark item as served
+  serveItem: (itemId: string) =>
+    fetchAPI<any>(`/waiter/items/${itemId}/served`, {
       method: "PATCH",
     }),
 };

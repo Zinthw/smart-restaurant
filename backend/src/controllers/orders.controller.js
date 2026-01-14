@@ -52,19 +52,21 @@ exports.getAll = async (req, res, next) => {
 
 /**
  * POST /api/orders
- * Create a new order
+ * Create a new order OR add to existing unpaid order
  */
 exports.create = async (req, res, next) => {
   const client = await db.pool.connect();
   try {
-    const { table_id, items, customer_name, notes } = req.body;
+    // Support both old format (table_id) and new format (tableId)
+    const { table_id, tableId, items, customer_name, customerId, notes } = req.body;
+    const finalTableId = tableId || table_id;
 
-    if (!table_id || !items || items.length === 0) {
-      return res.status(400).json({ message: "Missing table_id or items" });
+    if (!finalTableId || !items || items.length === 0) {
+      return res.status(400).json({ message: "Missing tableId or items" });
     }
 
     const tableRes = await db.query("SELECT id, table_number FROM tables WHERE id = $1", [
-      table_id,
+      finalTableId,
     ]);
     if (tableRes.rowCount === 0)
       return res.status(404).json({ message: "Table not found" });
@@ -72,16 +74,51 @@ exports.create = async (req, res, next) => {
 
     await client.query("BEGIN");
 
+    // Check if there's an existing unpaid order for this table
+    const existingOrderRes = await client.query(
+      `SELECT id, total_amount FROM orders 
+       WHERE table_id = $1 AND status NOT IN ('paid', 'cancelled')
+       ORDER BY created_at DESC LIMIT 1`,
+      [finalTableId]
+    );
+
+    let orderId;
+    let isNewOrder = false;
+
+    if (existingOrderRes.rowCount > 0) {
+      // Add to existing order
+      orderId = existingOrderRes.rows[0].id;
+      console.log(`Adding items to existing order ${orderId}`);
+    } else {
+      // Create new order
+      isNewOrder = true;
+      const finalUserId = customerId || req.customer?.userId || null;
+      const orderRes = await client.query(
+        `INSERT INTO orders (table_id, user_id, customer_name, total_amount, notes, status) 
+         VALUES ($1, $2, $3, 0, $4, 'pending') RETURNING id, created_at`,
+        [
+          finalTableId,
+          finalUserId,
+          customer_name || "Guest",
+          notes,
+        ]
+      );
+      orderId = orderRes.rows[0].id;
+      console.log(`Created new order ${orderId}`);
+    }
+
     let grandTotal = 0;
     const processedItems = [];
 
     for (const item of items) {
+      // Support both old format (menu_item_id) and new format (itemId)
+      const itemId = item.itemId || item.menu_item_id;
       const itemRes = await client.query(
         "SELECT price, name FROM menu_items WHERE id = $1",
-        [item.menu_item_id]
+        [itemId]
       );
       if (itemRes.rowCount === 0)
-        throw new Error(`Item ${item.menu_item_id} not found`);
+        throw new Error(`Item ${itemId} not found`);
 
       const basePrice = parseFloat(itemRes.rows[0].price);
       let modifiersPrice = 0;
@@ -98,33 +135,22 @@ exports.create = async (req, res, next) => {
       grandTotal += lineTotal;
 
       processedItems.push({
-        ...item,
+        menu_item_id: itemId,
+        quantity: item.quantity,
         name: itemRes.rows[0].name,
         price_per_unit: basePrice,
         total_price: lineTotal,
         modifiers_json: JSON.stringify(item.modifiers || []),
+        notes: item.notes,
       });
     }
 
-    const orderRes = await client.query(
-      `INSERT INTO orders (table_id, user_id, customer_name, total_amount, notes, status) 
-         VALUES ($1, $2, $3, $4, $5, 'pending') RETURNING id, created_at`,
-      [
-        table_id,
-        req.customer?.userId || null, // User ID from optionalCustomer middleware
-        customer_name || "Guest",
-        grandTotal,
-        notes,
-      ]
-    );
-    const order = orderRes.rows[0];
-
     for (const pItem of processedItems) {
       await client.query(
-        `INSERT INTO order_items (order_id, menu_item_id, quantity, price_per_unit, total_price, modifiers_selected, notes)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO order_items (order_id, menu_item_id, quantity, price_per_unit, total_price, modifiers_selected, notes, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')`,
         [
-          order.id,
+          orderId,
           pItem.menu_item_id,
           pItem.quantity,
           pItem.price_per_unit,
@@ -135,21 +161,35 @@ exports.create = async (req, res, next) => {
       );
     }
 
+    // Update total amount
+    if (isNewOrder) {
+      await client.query(
+        "UPDATE orders SET total_amount = $1 WHERE id = $2",
+        [grandTotal, orderId]
+      );
+    } else {
+      await client.query(
+        "UPDATE orders SET total_amount = total_amount + $1, updated_at = NOW() WHERE id = $2",
+        [grandTotal, orderId]
+      );
+    }
+
     await client.query("COMMIT");
 
     // --- SOCKET EMIT (REAL-TIME) ---
     try {
       const io = getIO();
-      io.to("role:waiter").emit("order:new", {
-        orderId: order.id,
+      const eventType = isNewOrder ? "order:new" : "order:updated";
+      io.to("role:waiter").emit(eventType, {
+        orderId: orderId,
         tableNumber: tableNumber,
         total: grandTotal,
         items: processedItems,
-        createdAt: order.created_at,
+        isNewOrder,finalTableI
       });
       io.to(`table:${table_id}`).emit("order:update", {
         status: "pending",
-        orderId: order.id,
+        orderId: orderId,
       });
     } catch (sErr) {
       console.error("Socket emit error:", sErr.message);
@@ -157,10 +197,14 @@ exports.create = async (req, res, next) => {
     // -------------------------------
 
     res.status(201).json({
-      message: "Order placed successfully",
-      order_id: order.id,
-      total: grandTotal,
-      status: "pending",
+      data: {
+        order_id: orderId,
+        id: orderId,
+        total: grandTotal,
+        status: "pending",
+        is_new_order: isNewOrder,
+      },
+      message: isNewOrder ? "Order placed successfully" : "Items added to existing order",
     });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -278,15 +322,24 @@ exports.addItems = async (req, res, next) => {
 exports.getById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const orderRes = await db.query("SELECT * FROM orders WHERE id = $1", [id]);
+    const orderRes = await db.query(
+      `SELECT o.*, t.table_number 
+       FROM orders o
+       LEFT JOIN tables t ON o.table_id = t.id
+       WHERE o.id = $1`,
+      [id]
+    );
     if (orderRes.rowCount === 0)
       return res.status(404).json({ message: "Order not found" });
 
     const itemsRes = await db.query(
       `
-            SELECT oi.*, mi.name as item_name
+            SELECT oi.*, 
+                   mi.name as item_name,
+                   mip.photo_url as item_image
             FROM order_items oi
             JOIN menu_items mi ON oi.menu_item_id = mi.id
+            LEFT JOIN menu_item_photos mip ON mi.id = mip.menu_item_id AND mip.is_primary = true
             WHERE oi.order_id = $1
         `,
       [id]
@@ -387,6 +440,68 @@ exports.attachCustomer = async (req, res, next) => {
     res.json({
       message: "Customer attached to order successfully",
       order: rows[0],
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /api/orders/:id/request-bill
+ * Request bill/payment from waiter (guest action)
+ */
+exports.requestBill = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Check order exists and is not paid/cancelled
+    const orderCheck = await db.query(
+      "SELECT o.*, t.table_number FROM orders o LEFT JOIN tables t ON o.table_id = t.id WHERE o.id = $1",
+      [id]
+    );
+
+    if (orderCheck.rowCount === 0) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    const order = orderCheck.rows[0];
+
+    if (order.status === 'paid') {
+      return res.status(400).json({ message: "Order already paid" });
+    }
+
+    if (order.status === 'cancelled') {
+      return res.status(400).json({ message: "Order is cancelled" });
+    }
+
+    // Update order to mark bill requested
+    await db.query(
+      `UPDATE orders SET bill_requested = true, bill_requested_at = NOW(), updated_at = NOW() WHERE id = $1`,
+      [id]
+    );
+
+    // Emit socket event to waiter
+    try {
+      const io = getIO();
+      io.to("role:waiter").emit("bill:requested", {
+        orderId: id,
+        tableNumber: order.table_number,
+        tableId: order.table_id,
+        total: order.total_amount,
+        requestedAt: new Date().toISOString(),
+      });
+      io.to("role:admin").emit("bill:requested", {
+        orderId: id,
+        tableNumber: order.table_number,
+        tableId: order.table_id,
+      });
+    } catch (sErr) {
+      console.error("Socket emit error:", sErr.message);
+    }
+
+    res.json({
+      message: "Bill request sent to waiter successfully",
+      order_id: id,
     });
   } catch (err) {
     next(err);

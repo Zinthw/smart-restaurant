@@ -82,6 +82,7 @@ export default function TablesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
+  const [qrLoadError, setQrLoadError] = useState(false);
   const [regeneratingAll, setRegeneratingAll] = useState(false);
   const [selectedTables, setSelectedTables] = useState<number[]>([]);
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -156,6 +157,7 @@ export default function TablesPage() {
   const handleGenerateQR = async (table: Table) => {
     setQrLoading(true);
     setQrImageUrl(null);
+    setQrLoadError(false);
     try {
       const result = await adminAPI.tables.generateQR(table.id);
       setQrImageUrl(result.qrImageDataUrl);
@@ -706,6 +708,7 @@ export default function TablesPage() {
                           onClick={() => {
                             setShowQrDialog(table);
                             setQrImageUrl(null);
+                            setQrLoadError(false);
                           }}
                         >
                           <QrCode className="mr-1 h-4 w-4" />
@@ -761,6 +764,7 @@ export default function TablesPage() {
           onOpenChange={() => {
             setShowQrDialog(null);
             setQrImageUrl(null);
+            setQrLoadError(false);
           }}
         >
           <DialogContent className="max-w-md">
@@ -780,11 +784,18 @@ export default function TablesPage() {
                     alt={`QR Code for Table ${showQrDialog?.table_number}`}
                     className="h-full w-full object-contain"
                   />
-                ) : showQrDialog?.qr_token ? (
+                ) : showQrDialog?.qr_token && !qrLoadError ? (
+                  <img
+                    src={`${window.location.origin}/api/admin/tables/${showQrDialog.id}/qr/download?format=png&token=${localStorage.getItem("admin_token")}`}
+                    alt={`QR Code for Table ${showQrDialog?.table_number}`}
+                    className="h-full w-full object-contain"
+                    onError={() => setQrLoadError(true)}
+                  />
+                ) : qrLoadError ? (
                   <div className="text-center p-4">
                     <QrCode className="h-16 w-16 text-muted-foreground mx-auto mb-2" />
                     <p className="text-xs text-muted-foreground">
-                      QR exists. Click &quot;Generate/Refresh&quot; to preview.
+                      Failed to load QR. Click &quot;Refresh QR&quot; below.
                     </p>
                   </div>
                 ) : (

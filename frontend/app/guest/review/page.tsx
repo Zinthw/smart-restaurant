@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { reviewsAPI, menuAPI } from "@/lib/api"
+import { reviewsAPI, menuAPI, customerAPI } from "@/lib/api"
 
 interface MenuItem {
   id: string
@@ -33,19 +33,24 @@ export default function ReviewPage() {
     const token = localStorage.getItem("customerToken")
     setIsLoggedIn(!!token)
 
-    // Fetch menu items for selection
-    const fetchMenuItems = async () => {
+    // Fetch menu items that customer has ordered
+    const fetchOrderedItems = async () => {
       try {
-        const response = await menuAPI.getItems()
-        setMenuItems(response.data || [])
+        if (token) {
+          // Fetch items customer has ordered
+          const response = await customerAPI.getOrderedItems()
+          setMenuItems(response || [])
+        } else {
+          setMenuItems([])
+        }
       } catch (err) {
-        console.error("Failed to fetch menu items:", err)
+        console.error("Failed to fetch ordered items:", err)
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchMenuItems()
+    fetchOrderedItems()
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,7 +61,7 @@ export default function ReviewPage() {
     setError("")
 
     try {
-      await reviewsAPI.submitReview(selectedItem, { rating, comment: comment || undefined })
+      await reviewsAPI.submit({ orderId: selectedItem, rating, comment: comment || undefined })
       setIsSubmitted(true)
     } catch (err: any) {
       console.error("Failed to submit review:", err)
