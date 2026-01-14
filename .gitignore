@@ -28,8 +28,11 @@ Thumbs.db
 coverage/
 .nyc_output/
 
-# Markdown docs (không push)
+# Markdown docs (chỉ docs/ folder được push)
 *.md
+!README.md
+!docs/*.md
+!docs/**/*.md
 
 backend/public/uploads/*
 !backend/public/uploads/.gitkeep
