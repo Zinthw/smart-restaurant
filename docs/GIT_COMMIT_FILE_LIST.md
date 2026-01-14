@@ -1,9 +1,9 @@
 # 📁 Chi Tiết Files Cho Mỗi Commit - Smart Restaurant
 
 > **Tổng quan project:**
-> - Backend: 17 routes, 5 middleware, migrations & seeds
+> - Backend: 17 routes + 17 controllers (MVC), 5 middleware, migrations & seeds
 > - Frontend: 57 UI components, ~30 pages
-> - Docs: 20 files trong 5 phases
+> - Docs: 25+ files trong 5 phases
 
 ---
 
@@ -128,15 +128,18 @@
 ---
 
 ### ═══════════════════════════════════════════════════════
-### COMMIT 7: Auth routes
+### COMMIT 7: Auth routes & controller
 **Author:** Dev B  
-**Message:** `feat(backend): Add authentication routes`  
+**Message:** `feat(backend): Add authentication routes and controller`  
 **Date:** 05/01/2026
 
 ```
 📁 Files to add:
-├── backend/src/routes/
-│   └── auth.js
+├── backend/src/
+│   ├── controllers/
+│   │   └── auth.controller.js
+│   └── routes/
+│       └── auth.js
 ```
 
 ---
@@ -144,16 +147,22 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 8: Menu API (Categories, Items, Modifiers)
 **Author:** Dev B  
-**Message:** `feat(backend): Add menu categories and items API`  
+**Message:** `feat(backend): Add menu categories and items API with controllers`  
 **Date:** 06/01/2026
 
 ```
 📁 Files to add:
-├── backend/src/routes/
-│   ├── categories.js
-│   ├── items.js
-│   ├── modifiers.js
-│   └── photos.js
+├── backend/src/
+│   ├── controllers/
+│   │   ├── categories.controller.js
+│   │   ├── items.controller.js
+│   │   ├── modifiers.controller.js
+│   │   └── photos.controller.js
+│   └── routes/
+│       ├── categories.js
+│       ├── items.js
+│       ├── modifiers.js
+│       └── photos.js
 ```
 
 ---
@@ -166,8 +175,11 @@
 
 ```
 📁 Files to add:
-├── backend/src/routes/
-│   └── public.js
+├── backend/src/
+│   ├── controllers/
+│   │   └── public.controller.js
+│   └── routes/
+│       └── public.js
 ```
 
 ---
@@ -265,13 +277,16 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 14: Orders API
 **Author:** Dev B  
-**Message:** `feat(backend): Add order creation and tracking API`  
+**Message:** `feat(backend): Add order creation and tracking API with controller`  
 **Date:** 08/01/2026
 
 ```
 📁 Files to add:
-├── backend/src/routes/
-│   └── orders.js
+├── backend/src/
+│   ├── controllers/
+│   │   └── orders.controller.js
+│   └── routes/
+│       └── orders.js
 ```
 
 ---
@@ -393,14 +408,18 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 22: Table & QR API
 **Author:** Dev B  
-**Message:** `feat(backend): Add table management and QR generation API`  
+**Message:** `feat(backend): Add table management and QR generation API with controllers`  
 **Date:** 12/01/2026
 
 ```
 📁 Files to add:
-├── backend/src/routes/
-│   ├── tables.js
-│   └── qr.js
+├── backend/src/
+│   ├── controllers/
+│   │   ├── tables.controller.js
+│   │   └── qr.controller.js
+│   └── routes/
+│       ├── tables.js
+│       └── qr.js
 ```
 
 ---
@@ -423,14 +442,18 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 24: Kitchen & Waiter API
 **Author:** Dev B  
-**Message:** `feat(backend): Add kitchen and waiter API`  
+**Message:** `feat(backend): Add kitchen and waiter API with controllers`  
 **Date:** 13/01/2026
 
 ```
 📁 Files to add:
-├── backend/src/routes/
-│   ├── kitchen.js
-│   └── waiter.js
+├── backend/src/
+│   ├── controllers/
+│   │   ├── kitchen.controller.js
+│   │   └── waiter.controller.js
+│   └── routes/
+│       ├── kitchen.js
+│       └── waiter.js
 ```
 
 ---
@@ -499,13 +522,16 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 28: Payment API
 **Author:** Dev B  
-**Message:** `feat(backend): Add payment and billing API`  
+**Message:** `feat(backend): Add payment and billing API with controller`  
 **Date:** 15/01/2026
 
 ```
 📁 Files to add:
-├── backend/src/routes/
-│   └── payment.js
+├── backend/src/
+│   ├── controllers/
+│   │   └── payment.controller.js
+│   └── routes/
+│       └── payment.js
 ```
 
 ---
@@ -531,13 +557,16 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 30: Reports API
 **Author:** Dev B  
-**Message:** `feat(backend): Add revenue and analytics API`  
+**Message:** `feat(backend): Add revenue and analytics API with controller`  
 **Date:** 16/01/2026
 
 ```
 📁 Files to add:
-├── backend/src/routes/
-│   └── reports.js
+├── backend/src/
+│   ├── controllers/
+│   │   └── reports.controller.js
+│   └── routes/
+│       └── reports.js
 ```
 
 ---
@@ -562,13 +591,16 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 32: Reviews API
 **Author:** Dev B  
-**Message:** `feat(backend): Add menu item reviews API`  
+**Message:** `feat(backend): Add menu item reviews API with controller`  
 **Date:** 17/01/2026
 
 ```
 📁 Files to add:
-├── backend/src/routes/
-│   └── reviews.js
+├── backend/src/
+│   ├── controllers/
+│   │   └── reviews.controller.js
+│   └── routes/
+│       └── reviews.js
 ```
 
 ---
@@ -591,13 +623,16 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 34: Customer & Profile API
 **Author:** Dev B  
-**Message:** `feat(backend): Add customer profile API`  
+**Message:** `feat(backend): Add customer profile API with controller`  
 **Date:** 17/01/2026
 
 ```
 📁 Files to add:
-├── backend/src/routes/
-│   └── customer.js
+├── backend/src/
+│   ├── controllers/
+│   │   └── customer.controller.js
+│   └── routes/
+│       └── customer.js
 ```
 
 ---
@@ -626,14 +661,18 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 36: User management API
 **Author:** Dev B  
-**Message:** `feat(backend): Add staff user management`  
+**Message:** `feat(backend): Add staff user management with controllers`  
 **Date:** 18/01/2026
 
 ```
 📁 Files to add:
-├── backend/src/routes/
-│   ├── users.js
-│   └── superadmin.js
+├── backend/src/
+│   ├── controllers/
+│   │   ├── users.controller.js
+│   │   └── superadmin.controller.js
+│   └── routes/
+│       ├── users.js
+│       └── superadmin.js
 ```
 
 ---
@@ -760,14 +799,17 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 44: Final guides
 **Author:** Dev A  
-**Message:** `docs: Add usage guides`  
+**Message:** `docs: Add usage guides and Jira setup`  
 **Date:** 22/01/2026
 
 ```
 📁 Files to add:
 ├── docs/
 │   ├── GIT_RESTRUCTURE_GUIDE.md
-│   └── DOCUMENTATION_USAGE_GUIDE.md
+│   ├── GIT_COMMIT_FILE_LIST.md
+│   ├── DOCUMENTATION_USAGE_GUIDE.md
+│   ├── FEATURE_AUDIT_REPORT.md
+│   └── JIRA_SETUP_GUIDE.md
 ```
 
 ---
