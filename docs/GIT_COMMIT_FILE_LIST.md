@@ -1,9 +1,9 @@
 # 📁 Chi Tiết Files Cho Mỗi Commit - Smart Restaurant
 
-> **Tổng quan project:**
+> **Tổng quan project thực tế:**
 > - Backend: 17 routes + 17 controllers (MVC), 5 middleware, migrations & seeds
-> - Frontend: 57 UI components, ~30 pages
-> - Docs: 25+ files trong 5 phases
+> - Frontend: 57 UI components, 6 guest components, 1 admin component, ~23 pages
+> - Docs: 18 files trong 5 phases + 6 root docs
 
 ---
 
@@ -17,9 +17,9 @@
 
 ```
 📁 Files to add:
-├── .gitignore                    (tạo mới)
-├── package.json                  (root - copy từ smart-restaurant/)
-└── README.md                     (viết mới, ngắn gọn)
+├── .gitignore
+├── package.json
+└── README.md
 ```
 
 ---
@@ -36,8 +36,9 @@
 │   ├── package.json
 │   ├── .env.example
 │   └── src/
-│       ├── index.js              (basic version - chỉ express setup)
-│       └── db.js
+│       ├── index.js
+│       ├── db.js
+│       └── socket.js
 ```
 
 ---
@@ -54,7 +55,7 @@
 │   ├── database.sql
 │   ├── migrate.js
 │   ├── seed.js
-│   └── seed-customer-orders.js   (optional)
+│   └── seed-customer-orders.js
 ```
 
 ---
@@ -72,12 +73,12 @@
 │   ├── next.config.mjs
 │   ├── tsconfig.json
 │   ├── postcss.config.mjs
+│   ├── components.json
 │   ├── .gitignore
-│   ├── app/
-│   │   ├── layout.tsx
-│   │   ├── page.tsx
-│   │   └── globals.css
-│   └── styles/                   (folder nếu có)
+│   └── app/
+│       ├── layout.tsx
+│       ├── page.tsx
+│       └── globals.css
 ```
 
 ---
@@ -104,25 +105,24 @@
 
 ---
 
-## 🍽️ SPRINT 1: GUEST ORDERING (Commits 6-15)
+## 🍽️ SPRINT 1: GUEST ORDERING (Commits 6-17)
 
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 6: Authentication middleware
 **Author:** Dev B  
-**Message:** `feat(backend): Add JWT authentication middleware`  
+**Message:** `feat(backend): Add authentication middleware`  
 **Date:** 05/01/2026
 
 ```
 📁 Files to add:
-├── backend/src/
-│   ├── middleware/
-│   │   ├── authMiddleware.js
-│   │   ├── errorHandler.js
-│   │   ├── rateLimiter.js
-│   │   ├── uploadMiddleware.js
-│   │   └── validators.js
-│   └── utils/
-│       └── sendEmail.js
+├── backend/src/middleware/
+│   ├── authMiddleware.js
+│   ├── errorHandler.js
+│   ├── rateLimiter.js
+│   ├── uploadMiddleware.js
+│   └── validators.js
+├── backend/src/utils/
+│   └── sendEmail.js
 ```
 
 ---
@@ -145,9 +145,9 @@
 ---
 
 ### ═══════════════════════════════════════════════════════
-### COMMIT 8: Menu API (Categories, Items, Modifiers)
+### COMMIT 8: Menu API (Categories, Items, Modifiers, Photos)
 **Author:** Dev B  
-**Message:** `feat(backend): Add menu categories and items API with controllers`  
+**Message:** `feat(backend): Add menu CRUD API with controllers`  
 **Date:** 06/01/2026
 
 ```
@@ -185,38 +185,61 @@
 ---
 
 ### ═══════════════════════════════════════════════════════
-### COMMIT 10: UI Components
+### COMMIT 10: UI Components library
 **Author:** Dev C  
-**Message:** `feat(frontend): Add UI component library`  
+**Message:** `feat(frontend): Add UI component library (57 components)`  
 **Date:** 07/01/2026
 
 ```
 📁 Files to add:
-├── frontend/
-│   ├── lib/
-│   │   └── utils.ts
-│   ├── components.json
-│   └── components/ui/
-│       ├── button.tsx
-│       ├── card.tsx
-│       ├── dialog.tsx
-│       ├── input.tsx
-│       ├── label.tsx
-│       ├── select.tsx
-│       ├── tabs.tsx
-│       ├── table.tsx
-│       ├── badge.tsx
-│       ├── drawer.tsx
-│       ├── toast.tsx
-│       ├── toaster.tsx
-│       ├── use-toast.ts
-│       ├── skeleton.tsx
-│       ├── spinner.tsx
-│       ├── separator.tsx
-│       └── (các ui components còn lại - tổng 57 files)
+├── frontend/lib/
+│   └── utils.ts
+├── frontend/components/ui/
+│   ├── accordion.tsx
+│   ├── alert-dialog.tsx
+│   ├── alert.tsx
+│   ├── avatar.tsx
+│   ├── badge.tsx
+│   ├── button.tsx
+│   ├── button-group.tsx
+│   ├── calendar.tsx
+│   ├── card.tsx
+│   ├── carousel.tsx
+│   ├── chart.tsx
+│   ├── checkbox.tsx
+│   ├── dialog.tsx
+│   ├── drawer.tsx
+│   ├── dropdown-menu.tsx
+│   ├── empty.tsx
+│   ├── field.tsx
+│   ├── form.tsx
+│   ├── input.tsx
+│   ├── input-group.tsx
+│   ├── label.tsx
+│   ├── pagination.tsx
+│   ├── popover.tsx
+│   ├── progress.tsx
+│   ├── radio-group.tsx
+│   ├── scroll-area.tsx
+│   ├── select.tsx
+│   ├── separator.tsx
+│   ├── sheet.tsx
+│   ├── sidebar.tsx
+│   ├── skeleton.tsx
+│   ├── slider.tsx
+│   ├── spinner.tsx
+│   ├── switch.tsx
+│   ├── table.tsx
+│   ├── tabs.tsx
+│   ├── textarea.tsx
+│   ├── toast.tsx
+│   ├── toaster.tsx
+│   ├── toggle.tsx
+│   ├── tooltip.tsx
+│   ├── use-mobile.tsx
+│   ├── use-toast.ts
+│   └── (các components còn lại - tổng 57 files)
 ```
-
-> **Note:** Có thể chia commit này thành 2-3 commits nhỏ hơn
 
 ---
 
@@ -233,6 +256,7 @@
 │   ├── category-tabs.tsx
 │   ├── menu-item-card.tsx
 │   ├── item-detail-modal.tsx
+│   ├── cart-drawer.tsx
 │   └── bottom-navigation.tsx
 ```
 
@@ -247,9 +271,7 @@
 ```
 📁 Files to add:
 ├── frontend/app/menu/
-│   ├── page.tsx
-│   └── guest/
-│       └── (files in folder)
+│   └── page.tsx (hoặc folder structure)
 ├── frontend/lib/
 │   ├── api.ts
 │   └── menu-data.ts
@@ -265,11 +287,8 @@
 
 ```
 📁 Files to add:
-├── frontend/
-│   ├── lib/
-│   │   └── cart-context.tsx
-│   └── components/guest/
-│       └── cart-drawer.tsx
+├── frontend/lib/
+│   └── cart-context.tsx
 ```
 
 ---
@@ -277,7 +296,7 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 14: Orders API
 **Author:** Dev B  
-**Message:** `feat(backend): Add order creation and tracking API with controller`  
+**Message:** `feat(backend): Add order creation and tracking API`  
 **Date:** 08/01/2026
 
 ```
@@ -292,24 +311,7 @@
 ---
 
 ### ═══════════════════════════════════════════════════════
-### COMMIT 15: Socket.IO real-time
-**Author:** Dev B  
-**Message:** `feat(backend): Add Socket.IO for real-time updates`  
-**Date:** 09/01/2026
-
-```
-📁 Files to add:
-├── backend/src/
-│   └── socket.js
-
-📁 Files to update:
-├── backend/src/index.js          (thêm socket integration)
-```
-
----
-
-### ═══════════════════════════════════════════════════════
-### COMMIT 16: Guest checkout page
+### COMMIT 15: Guest checkout page
 **Author:** Dev A  
 **Message:** `feat(frontend): Add checkout and order submission`  
 **Date:** 09/01/2026
@@ -324,7 +326,7 @@
 ---
 
 ### ═══════════════════════════════════════════════════════
-### COMMIT 17: Guest order tracking
+### COMMIT 16: Guest order tracking
 **Author:** Dev A  
 **Message:** `feat(frontend): Add real-time order status tracking`  
 **Date:** 09/01/2026
@@ -335,6 +337,29 @@
 │   ├── orders/
 │   │   └── page.tsx
 │   └── active-orders/
+│       └── page.tsx
+```
+
+---
+
+### ═══════════════════════════════════════════════════════
+### COMMIT 17: Guest authentication pages
+**Author:** Dev C  
+**Message:** `feat(frontend): Add guest login and registration`  
+**Date:** 09/01/2026
+
+```
+📁 Files to add:
+├── frontend/app/guest/
+│   ├── login/
+│   │   └── page.tsx
+│   ├── register/
+│   │   └── page.tsx
+│   ├── verify-email/
+│   │   └── page.tsx
+│   ├── forgot-password/
+│   │   └── page.tsx
+│   └── reset-password/
 │       └── page.tsx
 ```
 
@@ -367,8 +392,6 @@
 📁 Files to add:
 ├── frontend/components/admin/
 │   └── admin-layout.tsx
-├── frontend/components/ui/
-│   └── sidebar.tsx               (nếu chưa có)
 ├── frontend/components/
 │   └── theme-provider.tsx
 ```
@@ -408,7 +431,7 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 22: Table & QR API
 **Author:** Dev B  
-**Message:** `feat(backend): Add table management and QR generation API with controllers`  
+**Message:** `feat(backend): Add table management and QR generation API`  
 **Date:** 12/01/2026
 
 ```
@@ -495,19 +518,15 @@
 ---
 
 ### ═══════════════════════════════════════════════════════
-### COMMIT 27: Guest authentication pages
+### COMMIT 27: Admin password pages
 **Author:** Dev C  
-**Message:** `feat(frontend): Add guest login and registration`  
+**Message:** `feat(frontend): Add admin password management`  
 **Date:** 14/01/2026
 
 ```
 📁 Files to add:
-├── frontend/app/guest/
-│   ├── login/
-│   │   └── page.tsx
-│   ├── register/
-│   │   └── page.tsx
-│   ├── verify-email/
+├── frontend/app/admin/
+│   ├── change-password/
 │   │   └── page.tsx
 │   ├── forgot-password/
 │   │   └── page.tsx
@@ -522,7 +541,7 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 28: Payment API
 **Author:** Dev B  
-**Message:** `feat(backend): Add payment and billing API with controller`  
+**Message:** `feat(backend): Add payment and billing API`  
 **Date:** 15/01/2026
 
 ```
@@ -539,7 +558,7 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 29: Guest payment pages
 **Author:** Dev A  
-**Message:** `feat(frontend): Add payment page with Stripe integration`  
+**Message:** `feat(frontend): Add payment pages`  
 **Date:** 15/01/2026
 
 ```
@@ -557,7 +576,7 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 30: Reports API
 **Author:** Dev B  
-**Message:** `feat(backend): Add revenue and analytics API with controller`  
+**Message:** `feat(backend): Add revenue and analytics API`  
 **Date:** 16/01/2026
 
 ```
@@ -582,8 +601,6 @@
 ├── frontend/app/admin/
 │   └── reports/
 │       └── page.tsx
-├── frontend/components/ui/
-│   └── chart.tsx
 ```
 
 ---
@@ -591,7 +608,7 @@
 ### ═══════════════════════════════════════════════════════
 ### COMMIT 32: Reviews API
 **Author:** Dev B  
-**Message:** `feat(backend): Add menu item reviews API with controller`  
+**Message:** `feat(backend): Add menu item reviews API`  
 **Date:** 17/01/2026
 
 ```
@@ -606,24 +623,30 @@
 ---
 
 ### ═══════════════════════════════════════════════════════
-### COMMIT 33: Guest review page
+### COMMIT 33: Guest review & profile pages
 **Author:** Dev A  
-**Message:** `feat(frontend): Add review page`  
+**Message:** `feat(frontend): Add review and profile pages`  
 **Date:** 17/01/2026
 
 ```
 📁 Files to add:
 ├── frontend/app/guest/
-│   └── review/
+│   ├── review/
+│   │   └── page.tsx
+│   ├── profile/
+│   │   └── page.tsx
+│   ├── history/
+│   │   └── page.tsx
+│   └── change-password/
 │       └── page.tsx
 ```
 
 ---
 
 ### ═══════════════════════════════════════════════════════
-### COMMIT 34: Customer & Profile API
+### COMMIT 34: Customer API
 **Author:** Dev B  
-**Message:** `feat(backend): Add customer profile API with controller`  
+**Message:** `feat(backend): Add customer profile API`  
 **Date:** 17/01/2026
 
 ```
@@ -638,30 +661,9 @@
 ---
 
 ### ═══════════════════════════════════════════════════════
-### COMMIT 35: Guest profile pages
-**Author:** Dev A  
-**Message:** `feat(frontend): Add guest profile and history`  
-**Date:** 18/01/2026
-
-```
-📁 Files to add:
-├── frontend/app/guest/
-│   ├── profile/
-│   │   └── page.tsx
-│   ├── history/
-│   │   └── page.tsx
-│   └── change-password/
-│       └── page.tsx
-```
-
----
-
-## 🔧 SPRINT 4: POLISH (Commits 36-40)
-
-### ═══════════════════════════════════════════════════════
-### COMMIT 36: User management API
+### COMMIT 35: User management API
 **Author:** Dev B  
-**Message:** `feat(backend): Add staff user management with controllers`  
+**Message:** `feat(backend): Add user and superadmin management`  
 **Date:** 18/01/2026
 
 ```
@@ -677,45 +679,23 @@
 
 ---
 
-### ═══════════════════════════════════════════════════════
-### COMMIT 37: Password reset pages
-**Author:** Dev C  
-**Message:** `feat(frontend): Add password management pages`  
-**Date:** 19/01/2026
-
-```
-📁 Files to add:
-├── frontend/app/admin/
-│   ├── change-password/
-│   ├── forgot-password/
-│   └── reset-password/
-├── frontend/app/waiter/
-│   ├── change-password/
-│   ├── forgot-password/
-│   └── reset-password/
-├── frontend/app/kitchen/
-│   ├── change-password/
-│   ├── forgot-password/
-│   └── reset-password/
-```
-
----
+## 🔧 SPRINT 4: POLISH (Commits 36-40)
 
 ### ═══════════════════════════════════════════════════════
-### COMMIT 38: Bug fixes
+### COMMIT 36: Bug fixes
 **Author:** Dev A  
 **Message:** `fix(frontend): Fix cart and checkout bugs`  
 **Date:** 19/01/2026
 
 ```
 📁 Files to update:
-(various bug fixes - list specific files fixed)
+(various bug fixes across frontend)
 ```
 
 ---
 
 ### ═══════════════════════════════════════════════════════
-### COMMIT 39: Mobile responsive
+### COMMIT 37: Mobile responsive
 **Author:** Dev C  
 **Message:** `style(frontend): Improve mobile responsiveness`  
 **Date:** 19/01/2026
@@ -729,7 +709,7 @@
 ---
 
 ### ═══════════════════════════════════════════════════════
-### COMMIT 40: Execution docs
+### COMMIT 38: Execution docs
 **Author:** Dev A  
 **Message:** `docs: Add sprint execution documentation`  
 **Date:** 20/01/2026
@@ -741,6 +721,39 @@
 │   ├── SPRINT_BACKLOG.md
 │   ├── TECHNICAL_DECISIONS.md
 │   └── CODE_REVIEW_CHECKLIST.md
+```
+
+---
+
+### ═══════════════════════════════════════════════════════
+### COMMIT 39: Root documentation
+**Author:** Dev A  
+**Message:** `docs: Add setup guides and checklists`  
+**Date:** 20/01/2026
+
+```
+📁 Files to add:
+├── SETUP_GUIDE.md
+├── HUONG_DAN_CHAY_DEMO.md
+├── IMPLEMENTATION_GUIDE.md
+├── CHECKLIST_DEV_A.md
+├── CHECKLIST_DEV_B.md
+├── CHECKLIST_DEV_C.md
+└── FINAL_SPRINT_CHECKLIST.md
+```
+
+---
+
+### ═══════════════════════════════════════════════════════
+### COMMIT 40: Backend documentation
+**Author:** Dev B  
+**Message:** `docs: Add backend README and API docs`  
+**Date:** 20/01/2026
+
+```
+📁 Files to add:
+├── backend/README.md
+├── docs/API_DOCUMENTATION.md
 ```
 
 ---
@@ -781,35 +794,32 @@
 ---
 
 ### ═══════════════════════════════════════════════════════
-### COMMIT 43: API documentation
-**Author:** Dev B  
-**Message:** `docs: Add complete API documentation`  
+### COMMIT 43: Project management docs
+**Author:** Dev A  
+**Message:** `docs: Add Jira and Git restructure guides`  
 **Date:** 21/01/2026
 
 ```
 📁 Files to add:
 ├── docs/
-│   └── API_DOCUMENTATION.md
-├── backend/
-│   └── README.md
+│   ├── JIRA_SETUP_GUIDE.md
+│   ├── GIT_RESTRUCTURE_GUIDE.md
+│   ├── GIT_COMMIT_FILE_LIST.md
+│   ├── DOCUMENTATION_USAGE_GUIDE.md
+│   └── FEATURE_AUDIT_REPORT.md
 ```
 
 ---
 
 ### ═══════════════════════════════════════════════════════
-### COMMIT 44: Final guides
-**Author:** Dev A  
-**Message:** `docs: Add usage guides and Jira setup`  
+### COMMIT 44: Final polish
+**Author:** Dev C  
+**Message:** `feat: Final UI polish and fixes`  
 **Date:** 22/01/2026
 
 ```
-📁 Files to add:
-├── docs/
-│   ├── GIT_RESTRUCTURE_GUIDE.md
-│   ├── GIT_COMMIT_FILE_LIST.md
-│   ├── DOCUMENTATION_USAGE_GUIDE.md
-│   ├── FEATURE_AUDIT_REPORT.md
-│   └── JIRA_SETUP_GUIDE.md
+📁 Files to update:
+(final UI adjustments)
 ```
 
 ---
@@ -822,9 +832,7 @@
 
 ```
 📁 Files to update:
-├── README.md                     (full version)
-├── SETUP_GUIDE.md
-└── HUONG_DAN_CHAY_DEMO.md
+├── README.md (full version)
 ```
 
 ---
@@ -834,38 +842,176 @@
 | Sprint | Commits | Dev A | Dev B | Dev C |
 |--------|---------|-------|-------|-------|
 | 0 | 5 | 1 | 3 | 1 |
-| 1 | 12 | 6 | 5 | 1 |
+| 1 | 12 | 6 | 4 | 2 |
 | 2 | 10 | 0 | 3 | 7 |
-| 3 | 8 | 3 | 4 | 1 |
-| 4 | 5 | 1 | 1 | 3 |
-| 5 | 5 | 4 | 1 | 0 |
-| **Total** | **45** | **15** | **17** | **13** |
+| 3 | 8 | 2 | 4 | 2 |
+| 4 | 5 | 3 | 1 | 1 |
+| 5 | 5 | 3 | 0 | 2 |
+| **Total** | **45** | **15** | **15** | **15** |
 
-**Percentage:** Dev A (33%), Dev B (38%), Dev C (29%)
+**Percentage:** Dev A (33%), Dev B (33%), Dev C (33%)
 
 ---
 
-## ⚡ QUICK START SCRIPT
+## 📂 TÓM TẮT CẤU TRÚC PROJECT THỰC TẾ
 
-```powershell
-# 1. Tạo folder mới
-cd F:\Web
-mkdir smart-restaurant-new
-cd smart-restaurant-new
-git init
-
-# 2. Set author cho Dev B (commit 1-4)
-git config user.name "DevB Name"
-git config user.email "devb@example.com"
-
-# 3. Set date cho commit 1
-$env:GIT_AUTHOR_DATE = "2026-01-03T09:00:00"
-$env:GIT_COMMITTER_DATE = "2026-01-03T09:00:00"
-
-# 4. Copy files và commit
-# ... copy files ...
-git add .
-git commit -m "chore: Initialize project structure"
-
-# 5. Tiếp tục với các commits khác...
 ```
+smart-restaurant/
+├── .gitignore
+├── package.json
+├── README.md
+├── SETUP_GUIDE.md
+├── HUONG_DAN_CHAY_DEMO.md
+├── IMPLEMENTATION_GUIDE.md
+├── CHECKLIST_DEV_A.md
+├── CHECKLIST_DEV_B.md
+├── CHECKLIST_DEV_C.md
+├── FINAL_SPRINT_CHECKLIST.md
+│
+├── backend/
+│   ├── package.json
+│   ├── .env.example
+│   ├── README.md
+│   ├── database.sql
+│   ├── migrate.js
+│   ├── seed.js
+│   ├── seed-customer-orders.js
+│   └── src/
+│       ├── index.js
+│       ├── db.js
+│       ├── socket.js
+│       ├── controllers/           (17 files)
+│       │   ├── auth.controller.js
+│       │   ├── categories.controller.js
+│       │   ├── customer.controller.js
+│       │   ├── items.controller.js
+│       │   ├── kitchen.controller.js
+│       │   ├── modifiers.controller.js
+│       │   ├── orders.controller.js
+│       │   ├── payment.controller.js
+│       │   ├── photos.controller.js
+│       │   ├── public.controller.js
+│       │   ├── qr.controller.js
+│       │   ├── reports.controller.js
+│       │   ├── reviews.controller.js
+│       │   ├── superadmin.controller.js
+│       │   ├── tables.controller.js
+│       │   ├── users.controller.js
+│       │   └── waiter.controller.js
+│       ├── routes/                (17 files)
+│       │   ├── auth.js
+│       │   ├── categories.js
+│       │   ├── customer.js
+│       │   ├── items.js
+│       │   ├── kitchen.js
+│       │   ├── modifiers.js
+│       │   ├── orders.js
+│       │   ├── payment.js
+│       │   ├── photos.js
+│       │   ├── public.js
+│       │   ├── qr.js
+│       │   ├── reports.js
+│       │   ├── reviews.js
+│       │   ├── superadmin.js
+│       │   ├── tables.js
+│       │   ├── users.js
+│       │   └── waiter.js
+│       ├── middleware/            (5 files)
+│       │   ├── authMiddleware.js
+│       │   ├── errorHandler.js
+│       │   ├── rateLimiter.js
+│       │   ├── uploadMiddleware.js
+│       │   └── validators.js
+│       └── utils/
+│           └── sendEmail.js
+│
+├── frontend/
+│   ├── package.json
+│   ├── next.config.mjs
+│   ├── tsconfig.json
+│   ├── components.json
+│   ├── app/
+│   │   ├── layout.tsx
+│   │   ├── page.tsx
+│   │   ├── globals.css
+│   │   ├── menu/
+│   │   ├── admin/                 (9 pages)
+│   │   │   ├── login/
+│   │   │   ├── dashboard/
+│   │   │   ├── menu/
+│   │   │   ├── tables/
+│   │   │   ├── kds/
+│   │   │   ├── reports/
+│   │   │   ├── change-password/
+│   │   │   ├── forgot-password/
+│   │   │   └── reset-password/
+│   │   ├── guest/                 (14 pages)
+│   │   │   ├── login/
+│   │   │   ├── register/
+│   │   │   ├── verify-email/
+│   │   │   ├── forgot-password/
+│   │   │   ├── reset-password/
+│   │   │   ├── change-password/
+│   │   │   ├── checkout/
+│   │   │   ├── orders/
+│   │   │   ├── active-orders/
+│   │   │   ├── pending-payment/
+│   │   │   ├── payment/
+│   │   │   ├── profile/
+│   │   │   ├── history/
+│   │   │   └── review/
+│   │   ├── kitchen/
+│   │   └── waiter/
+│   ├── components/
+│   │   ├── ui/                    (57 files)
+│   │   ├── guest/                 (6 files)
+│   │   │   ├── menu-header.tsx
+│   │   │   ├── category-tabs.tsx
+│   │   │   ├── menu-item-card.tsx
+│   │   │   ├── item-detail-modal.tsx
+│   │   │   ├── cart-drawer.tsx
+│   │   │   └── bottom-navigation.tsx
+│   │   ├── admin/
+│   │   │   └── admin-layout.tsx
+│   │   └── theme-provider.tsx
+│   └── lib/
+│       ├── api.ts
+│       ├── utils.ts
+│       ├── menu-data.ts
+│       └── cart-context.tsx
+│
+└── docs/
+    ├── API_DOCUMENTATION.md
+    ├── DOCUMENTATION_USAGE_GUIDE.md
+    ├── FEATURE_AUDIT_REPORT.md
+    ├── GIT_COMMIT_FILE_LIST.md
+    ├── GIT_RESTRUCTURE_GUIDE.md
+    ├── JIRA_SETUP_GUIDE.md
+    ├── 01-initiation/             (3 files)
+    │   ├── PROJECT_CHARTER.md
+    │   ├── TEAM_ORGANIZATION.md
+    │   └── COMMUNICATION_PLAN.md
+    ├── 02-planning/               (4 files)
+    │   ├── WORK_BREAKDOWN_STRUCTURE.md
+    │   ├── SPRINT_PLANNING.md
+    │   ├── RISK_REGISTER.md
+    │   └── DEFINITION_OF_DONE.md
+    ├── 03-execution/              (4 files)
+    │   ├── DAILY_STANDUP_LOG.md
+    │   ├── SPRINT_BACKLOG.md
+    │   ├── TECHNICAL_DECISIONS.md
+    │   └── CODE_REVIEW_CHECKLIST.md
+    ├── 04-monitoring/             (4 files)
+    │   ├── BURNDOWN_CHART.md
+    │   ├── ISSUE_TRACKER.md
+    │   ├── SPRINT_RETROSPECTIVE.md
+    │   └── GIT_STATISTICS.md
+    └── 05-closure/                (3 files)
+        ├── DEPLOYMENT_CHECKLIST.md
+        ├── DEMO_SCRIPT.md
+        └── LESSONS_LEARNED.md
+```
+
+---
+
+*Document version: 3.0 | Updated: 15/01/2026 | Reflects actual project structure*

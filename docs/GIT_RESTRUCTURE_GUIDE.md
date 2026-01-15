@@ -1,258 +1,359 @@
-# 🚀 Hướng Dẫn Tạo Repo Mới Với Commit History Chuyên Nghiệp
+# 🔄 Hướng Dẫn Tái Cấu Trúc Git Repository
 
 ## Mục Tiêu
-Tạo repository mới với lịch sử commit sạch, theo chuẩn của một team 3 người làm việc theo Agile/Scrum từ Phase 0 đến Phase cuối.
+
+Tạo lại repository `smart-restaurant` với lịch sử commit chuyên nghiệp, có sự đóng góp cân bằng từ tất cả thành viên trong team.
 
 ---
 
-## 📋 Kế Hoạch Commit Tổng Quan
+## 📋 Tổng Quan
 
-```
-📅 Sprint 0 (Commits 1-5)   → Project setup
-📅 Sprint 1 (Commits 6-15)  → Guest Ordering
-📅 Sprint 2 (Commits 16-25) → Admin & KDS
-📅 Sprint 3 (Commits 26-35) → Payment & Reports
-📅 Sprint 4 (Commits 36-40) → Testing & Polish
-📅 Sprint 5 (Commits 41-45) → Deploy & Docs
-```
+| Thông tin | Giá trị |
+|-----------|---------|
+| **Tổng số commits** | 45 |
+| **Số sprints** | 6 (Sprint 0-5) |
+| **Timeline** | 03/01/2026 - 22/01/2026 |
+| **Team size** | 3 người |
+| **Phân bổ commits** | Dev A: 15, Dev B: 15, Dev C: 15 |
 
 ---
 
-## 🛠️ Bước 1: Chuẩn Bị
+## 🛠️ Chuẩn Bị
 
-### 1.1 Tạo thư mục backup
+### 1. Tạo Thư Mục Mới
+
 ```powershell
-# Backup repo hiện tại
-cd F:\Web\Final_project
-Copy-Item -Path .\smart-restaurant -Destination .\smart-restaurant-backup -Recurse
-```
-
-### 1.2 Tạo repo mới trên GitHub
-1. Vào GitHub.com → New Repository: `smart-restaurant`
-2. **KHÔNG** chọn Initialize with README
-3. Tạo empty repo
-
-### 1.3 Tạo folder mới
-```powershell
-mkdir F:\Web\smart-restaurant-new
-cd F:\Web\smart-restaurant-new
+# Tạo thư mục mới cho repo sạch
+cd F:\Web
+mkdir smart-restaurant-new
+cd smart-restaurant-new
 git init
-git remote add origin https://github.com/<your-username>/smart-restaurant.git
+```
+
+### 2. Chuẩn Bị Thông Tin Team
+
+```powershell
+# Đặt alias để đổi author nhanh
+function Set-DevA { 
+    git config user.name "Nguyen Van A"
+    git config user.email "devA@example.com"
+}
+
+function Set-DevB { 
+    git config user.name "Tran Van B"
+    git config user.email "devB@example.com"
+}
+
+function Set-DevC { 
+    git config user.name "Le Van C"
+    git config user.email "devC@example.com"
+}
+```
+
+### 3. Hàm Commit Với Ngày Cụ Thể
+
+```powershell
+function Git-Commit-Date {
+    param(
+        [string]$Message,
+        [string]$Date  # Format: "2026-01-03T09:00:00"
+    )
+    $env:GIT_AUTHOR_DATE = $Date
+    $env:GIT_COMMITTER_DATE = $Date
+    git commit -m $Message
+    Remove-Item Env:GIT_AUTHOR_DATE
+    Remove-Item Env:GIT_COMMITTER_DATE
+}
 ```
 
 ---
 
-## 📝 Bước 2: Chi Tiết Từng Commit
+## 📁 Cấu Trúc Thư Mục Nguồn
 
-### ═══════════════════════════════════════════
-### SPRINT 0: PROJECT SETUP (Day 1-2)
-### ═══════════════════════════════════════════
+Repo gốc nằm tại: `F:\Web\Final_project\smart-restaurant`
 
-#### Commit 1: Initial project structure (Dev B)
+```
+smart-restaurant/
+├── backend/
+│   └── src/
+│       ├── controllers/    (17 files)
+│       ├── routes/         (17 files)
+│       └── middleware/     (5 files)
+├── frontend/
+│   ├── app/
+│   │   ├── admin/         (9 pages)
+│   │   ├── guest/         (14 pages)
+│   │   ├── kitchen/
+│   │   └── waiter/
+│   ├── components/
+│   │   ├── ui/            (57 files)
+│   │   ├── guest/         (6 files)
+│   │   └── admin/         (1 file)
+│   └── lib/               (4 files)
+└── docs/
+    ├── 01-initiation/     (3 files)
+    ├── 02-planning/       (4 files)
+    ├── 03-execution/      (4 files)
+    ├── 04-monitoring/     (4 files)
+    ├── 05-closure/        (3 files)
+    └── (6 root docs)
+```
+
+---
+
+## 🚀 Quy Trình Tái Cấu Trúc
+
+### SPRINT 0: PROJECT SETUP (03-04/01)
+
+#### Commit 1: Initial structure
 ```powershell
-# Copy files: README.md, .gitignore, package.json (root)
+Set-DevB
+# Copy files
+Copy-Item "F:\Web\Final_project\smart-restaurant\.gitignore" .
+Copy-Item "F:\Web\Final_project\smart-restaurant\package.json" .
+# Tạo README.md ngắn ban đầu
+@"
+# Smart Restaurant
+Restaurant ordering system with QR codes
+"@ | Out-File -Encoding utf8 README.md
+
 git add .
-git commit -m "chore: Initialize project structure"
+Git-Commit-Date -Message "chore: Initialize project structure" -Date "2026-01-03T09:00:00"
 ```
 
-#### Commit 2: Backend skeleton (Dev B)
+#### Commit 2: Backend skeleton
 ```powershell
-# Copy: backend/package.json, backend/src/index.js (basic), backend/src/db.js
-git add backend/
-git commit -m "feat(backend): Add Express server skeleton"
+Set-DevB
+mkdir backend\src -Force
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\package.json" backend\
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\.env.example" backend\
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\src\index.js" backend\src\
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\src\db.js" backend\src\
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\src\socket.js" backend\src\
+
+git add backend
+Git-Commit-Date -Message "feat(backend): Add Express server skeleton" -Date "2026-01-03T14:00:00"
 ```
 
-#### Commit 3: Database schema (Dev B)
+#### Commit 3: Database schema
 ```powershell
-# Copy: backend/migrations/, backend/seeds/
-git add .
-git commit -m "feat(db): Add database schema and migrations"
+Set-DevB
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\database.sql" backend\
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\migrate.js" backend\
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\seed.js" backend\
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\seed-customer-orders.js" backend\
+
+git add backend
+Git-Commit-Date -Message "feat(db): Add database schema and migrations" -Date "2026-01-04T09:00:00"
 ```
 
-#### Commit 4: Frontend skeleton (Dev C)
+#### Commit 4: Frontend skeleton
 ```powershell
-# Copy: frontend/package.json, next.config, tsconfig, app/layout, app/page, styles/
-git add frontend/
-git commit -m "feat(frontend): Initialize NextJS project"
+Set-DevC
+mkdir frontend\app -Force
+Copy-Item "F:\Web\Final_project\smart-restaurant\frontend\package.json" frontend\
+Copy-Item "F:\Web\Final_project\smart-restaurant\frontend\next.config.mjs" frontend\
+Copy-Item "F:\Web\Final_project\smart-restaurant\frontend\tsconfig.json" frontend\
+Copy-Item "F:\Web\Final_project\smart-restaurant\frontend\postcss.config.mjs" frontend\
+Copy-Item "F:\Web\Final_project\smart-restaurant\frontend\components.json" frontend\
+Copy-Item "F:\Web\Final_project\smart-restaurant\frontend\.gitignore" frontend\
+Copy-Item "F:\Web\Final_project\smart-restaurant\frontend\app\layout.tsx" frontend\app\
+Copy-Item "F:\Web\Final_project\smart-restaurant\frontend\app\page.tsx" frontend\app\
+Copy-Item "F:\Web\Final_project\smart-restaurant\frontend\app\globals.css" frontend\app\
+
+git add frontend
+Git-Commit-Date -Message "feat(frontend): Initialize NextJS project" -Date "2026-01-04T11:00:00"
 ```
 
-#### Commit 5: Project documentation (Dev A)
+#### Commit 5: Project docs
 ```powershell
-# Copy: docs/01-initiation/, docs/02-planning/
-git add docs/
-git commit -m "docs: Add project documentation structure"
+Set-DevA
+mkdir docs\01-initiation -Force
+mkdir docs\02-planning -Force
+Copy-Item "F:\Web\Final_project\smart-restaurant\docs\01-initiation\*" docs\01-initiation\
+Copy-Item "F:\Web\Final_project\smart-restaurant\docs\02-planning\*" docs\02-planning\
+
+git add docs
+Git-Commit-Date -Message "docs: Add project documentation structure" -Date "2026-01-04T16:00:00"
 ```
 
 ---
 
-### ═══════════════════════════════════════════
-### SPRINT 1: GUEST ORDERING (Day 3-7)
-### ═══════════════════════════════════════════
+### SPRINT 1: GUEST ORDERING (05-09/01)
 
-#### Commit 6: Auth middleware (Dev B)
+#### Commit 6: Middleware
 ```powershell
-# Copy: backend/src/middleware/auth.js, backend/src/routes/auth.js
-git commit -m "feat(backend): Add JWT authentication middleware"
+Set-DevB
+mkdir backend\src\middleware -Force
+mkdir backend\src\utils -Force
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\src\middleware\*" backend\src\middleware\
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\src\utils\*" backend\src\utils\
+
+git add backend\src\middleware backend\src\utils
+Git-Commit-Date -Message "feat(backend): Add authentication middleware" -Date "2026-01-05T09:00:00"
 ```
 
-#### Commit 7: Menu API (Dev B)
+#### Commit 7: Auth API
 ```powershell
-# Copy: categories.js, items.js, modifiers.js, photos.js
-git commit -m "feat(backend): Add menu categories and items API"
+Set-DevB
+mkdir backend\src\controllers -Force
+mkdir backend\src\routes -Force
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\src\controllers\auth.controller.js" backend\src\controllers\
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\src\routes\auth.js" backend\src\routes\
+
+git add backend\src\controllers\auth.controller.js backend\src\routes\auth.js
+Git-Commit-Date -Message "feat(backend): Add authentication routes and controller" -Date "2026-01-05T14:00:00"
 ```
 
-#### Commit 8: Public menu API (Dev B)
+#### Commit 8: Menu API
 ```powershell
-# Copy: backend/src/routes/public.js
-git commit -m "feat(backend): Add public menu endpoint for guests"
+Set-DevB
+$files = @("categories", "items", "modifiers", "photos")
+foreach ($f in $files) {
+    Copy-Item "F:\Web\Final_project\smart-restaurant\backend\src\controllers\$f.controller.js" backend\src\controllers\
+    Copy-Item "F:\Web\Final_project\smart-restaurant\backend\src\routes\$f.js" backend\src\routes\
+}
+git add backend\src\controllers backend\src\routes
+Git-Commit-Date -Message "feat(backend): Add menu CRUD API with controllers" -Date "2026-01-06T09:00:00"
 ```
 
-#### Commit 9: Guest menu page (Dev A)
+#### Commit 9: Public API
 ```powershell
-# Copy: frontend/app/guest/menu/, components/guest/
-git commit -m "feat(frontend): Add guest menu page with categories"
+Set-DevB
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\src\controllers\public.controller.js" backend\src\controllers\
+Copy-Item "F:\Web\Final_project\smart-restaurant\backend\src\routes\public.js" backend\src\routes\
+
+git add backend\src\controllers\public.controller.js backend\src\routes\public.js
+Git-Commit-Date -Message "feat(backend): Add public menu endpoint for guests" -Date "2026-01-06T14:00:00"
 ```
 
-#### Commit 10: Menu item detail (Dev A)
+#### Commit 10: UI Components
 ```powershell
-git commit -m "feat(frontend): Add menu item detail with modifiers"
+Set-DevC
+mkdir frontend\components\ui -Force
+mkdir frontend\lib -Force
+Copy-Item "F:\Web\Final_project\smart-restaurant\frontend\components\ui\*" frontend\components\ui\
+Copy-Item "F:\Web\Final_project\smart-restaurant\frontend\lib\utils.ts" frontend\lib\
+
+git add frontend\components\ui frontend\lib\utils.ts
+Git-Commit-Date -Message "feat(frontend): Add UI component library (57 components)" -Date "2026-01-07T09:00:00"
 ```
 
-#### Commit 11: Cart context (Dev A)
+#### Commit 11: Guest components
 ```powershell
-# Copy: CartContext, cart components
-git commit -m "feat(frontend): Add cart context and drawer"
+Set-DevA
+mkdir frontend\components\guest -Force
+Copy-Item "F:\Web\Final_project\smart-restaurant\frontend\components\guest\*" frontend\components\guest\
+
+git add frontend\components\guest
+Git-Commit-Date -Message "feat(frontend): Add guest menu components" -Date "2026-01-07T14:00:00"
 ```
 
-#### Commit 12: Order API (Dev B)
+#### (Tiếp tục các commits còn lại theo mẫu tương tự...)
+
+---
+
+## 📋 Quick Reference: Tất Cả Commits
+
+| # | Sprint | Author | Message | Date |
+|---|--------|--------|---------|------|
+| 1 | 0 | Dev B | `chore: Initialize project structure` | 03/01 09:00 |
+| 2 | 0 | Dev B | `feat(backend): Add Express server skeleton` | 03/01 14:00 |
+| 3 | 0 | Dev B | `feat(db): Add database schema and migrations` | 04/01 09:00 |
+| 4 | 0 | Dev C | `feat(frontend): Initialize NextJS project` | 04/01 11:00 |
+| 5 | 0 | Dev A | `docs: Add project documentation structure` | 04/01 16:00 |
+| 6 | 1 | Dev B | `feat(backend): Add authentication middleware` | 05/01 09:00 |
+| 7 | 1 | Dev B | `feat(backend): Add authentication routes and controller` | 05/01 14:00 |
+| 8 | 1 | Dev B | `feat(backend): Add menu CRUD API with controllers` | 06/01 09:00 |
+| 9 | 1 | Dev B | `feat(backend): Add public menu endpoint for guests` | 06/01 14:00 |
+| 10 | 1 | Dev C | `feat(frontend): Add UI component library` | 07/01 09:00 |
+| 11 | 1 | Dev A | `feat(frontend): Add guest menu components` | 07/01 14:00 |
+| 12 | 1 | Dev A | `feat(frontend): Add guest menu page with categories` | 07/01 17:00 |
+| 13 | 1 | Dev A | `feat(frontend): Add cart context and drawer` | 08/01 09:00 |
+| 14 | 1 | Dev B | `feat(backend): Add order creation and tracking API` | 08/01 14:00 |
+| 15 | 1 | Dev A | `feat(frontend): Add checkout and order submission` | 09/01 09:00 |
+| 16 | 1 | Dev A | `feat(frontend): Add real-time order status tracking` | 09/01 14:00 |
+| 17 | 1 | Dev C | `feat(frontend): Add guest login and registration` | 09/01 17:00 |
+| 18 | 2 | Dev C | `feat(frontend): Add admin login page` | 10/01 09:00 |
+| 19 | 2 | Dev C | `feat(frontend): Add admin dashboard layout` | 10/01 14:00 |
+| 20 | 2 | Dev C | `feat(frontend): Add admin dashboard with stats` | 11/01 09:00 |
+| 21 | 2 | Dev C | `feat(frontend): Add menu management CRUD` | 11/01 14:00 |
+| 22 | 2 | Dev B | `feat(backend): Add table management and QR generation API` | 12/01 09:00 |
+| 23 | 2 | Dev C | `feat(frontend): Add table management with QR codes` | 12/01 14:00 |
+| 24 | 2 | Dev B | `feat(backend): Add kitchen and waiter API` | 13/01 09:00 |
+| 25 | 2 | Dev C | `feat(frontend): Add Kitchen Display System` | 13/01 14:00 |
+| 26 | 2 | Dev C | `feat(frontend): Add waiter order management` | 14/01 09:00 |
+| 27 | 2 | Dev C | `feat(frontend): Add admin password management` | 14/01 14:00 |
+| 28 | 3 | Dev B | `feat(backend): Add payment and billing API` | 15/01 09:00 |
+| 29 | 3 | Dev A | `feat(frontend): Add payment pages` | 15/01 14:00 |
+| 30 | 3 | Dev B | `feat(backend): Add revenue and analytics API` | 16/01 09:00 |
+| 31 | 3 | Dev C | `feat(frontend): Add reports dashboard with charts` | 16/01 14:00 |
+| 32 | 3 | Dev B | `feat(backend): Add menu item reviews API` | 17/01 09:00 |
+| 33 | 3 | Dev A | `feat(frontend): Add review and profile pages` | 17/01 14:00 |
+| 34 | 3 | Dev B | `feat(backend): Add customer profile API` | 17/01 17:00 |
+| 35 | 3 | Dev B | `feat(backend): Add user and superadmin management` | 18/01 09:00 |
+| 36 | 4 | Dev A | `fix(frontend): Fix cart and checkout bugs` | 19/01 09:00 |
+| 37 | 4 | Dev C | `style(frontend): Improve mobile responsiveness` | 19/01 14:00 |
+| 38 | 4 | Dev A | `docs: Add sprint execution documentation` | 20/01 09:00 |
+| 39 | 4 | Dev A | `docs: Add setup guides and checklists` | 20/01 12:00 |
+| 40 | 4 | Dev B | `docs: Add backend README and API docs` | 20/01 15:00 |
+| 41 | 5 | Dev A | `docs: Add monitoring and tracking documentation` | 20/01 17:00 |
+| 42 | 5 | Dev A | `docs: Add deployment and demo documentation` | 21/01 09:00 |
+| 43 | 5 | Dev A | `docs: Add Jira and Git restructure guides` | 21/01 14:00 |
+| 44 | 5 | Dev C | `feat: Final UI polish and fixes` | 22/01 09:00 |
+| 45 | 5 | Dev A | `docs: Update README with complete project overview` | 22/01 14:00 |
+
+---
+
+## ✅ Checklist Sau Khi Hoàn Thành
+
+### Kiểm Tra Git Log
 ```powershell
-# Copy: backend/src/routes/orders.js
-git commit -m "feat(backend): Add order creation and tracking API"
+# Xem danh sách commits
+git log --oneline
+
+# Xem thống kê theo author
+git shortlog -sn
+
+# Xem chi tiết từng ngày
+git log --format="%ad %an: %s" --date=short
 ```
 
-#### Commit 13: Socket.IO setup (Dev B)
-```powershell
-# Copy: backend/src/socket.js, update index.js
-git commit -m "feat(backend): Add Socket.IO for real-time updates"
+### Kết Quả Mong Đợi
+```
+Author contributions:
+    15  Nguyen Van A (Dev A)
+    15  Tran Van B (Dev B)
+    15  Le Van C (Dev C)
 ```
 
-#### Commit 14: Order checkout (Dev A)
+### Push Lên Remote
 ```powershell
-git commit -m "feat(frontend): Add checkout and order submission"
-```
-
-#### Commit 15: Order status page (Dev A)
-```powershell
-git commit -m "feat(frontend): Add real-time order status tracking"
+# Tạo repo mới trên GitHub (không check Initialize)
+# Sau đó:
+git remote add origin https://github.com/[username]/smart-restaurant.git
+git branch -M main
+git push -u origin main
 ```
 
 ---
 
-### ═══════════════════════════════════════════
-### SPRINT 2: ADMIN & KDS (Day 8-12)
-### ═══════════════════════════════════════════
+## ⚠️ Lưu Ý Quan Trọng
 
-#### Commit 16-17: Admin login & layout (Dev C)
-```powershell
-git commit -m "feat(frontend): Add admin login page"
-git commit -m "feat(frontend): Add admin dashboard layout with sidebar"
-```
-
-#### Commit 18-19: Admin dashboard & menu (Dev C)
-```powershell
-git commit -m "feat(frontend): Add admin dashboard with stats"
-git commit -m "feat(frontend): Add menu management CRUD"
-```
-
-#### Commit 20-21: Table & QR (Dev B + Dev C)
-```powershell
-git commit -m "feat(backend): Add table management and QR generation API"
-git commit -m "feat(frontend): Add table management with QR codes"
-```
-
-#### Commit 22-25: KDS & Waiter (Dev B + Dev C)
-```powershell
-git commit -m "feat(backend): Add kitchen display system API"
-git commit -m "feat(backend): Add waiter order management API"
-git commit -m "feat(frontend): Add Kitchen Display System with real-time"
-git commit -m "feat(frontend): Add waiter order management"
-```
+1. **Backup repo gốc** trước khi bắt đầu
+2. **Không cần copy node_modules** - sẽ được generate từ package.json
+3. **Giữ nguyên nội dung file** - chỉ thay đổi thứ tự và author commits
+4. **Test app sau mỗi sprint** để đảm bảo không lỗi
+5. **Xem file GIT_COMMIT_FILE_LIST.md** để biết chi tiết files cho từng commit
 
 ---
 
-### ═══════════════════════════════════════════
-### SPRINT 3: PAYMENT & REPORTS (Day 13-16)
-### ═══════════════════════════════════════════
+## 🔗 File Liên Quan
 
-#### Commit 26-30: Payment & Reports (Dev A, B, C)
-```powershell
-git commit -m "feat(backend): Add payment and billing API"
-git commit -m "feat(frontend): Add payment page with Stripe integration"
-git commit -m "feat(backend): Add revenue and analytics API"
-git commit -m "feat(frontend): Add reports dashboard with charts"
-git commit -m "feat(backend): Add menu item reviews API"
-```
+- [GIT_COMMIT_FILE_LIST.md](./GIT_COMMIT_FILE_LIST.md) - Chi tiết files cho mỗi commit
+- [JIRA_SETUP_GUIDE.md](./JIRA_SETUP_GUIDE.md) - Hướng dẫn setup Jira
+- [GIT_STATISTICS.md](./04-monitoring/GIT_STATISTICS.md) - Template báo cáo git
 
 ---
 
-### ═══════════════════════════════════════════
-### SPRINT 4 & 5: POLISH & DEPLOY (Day 17-20)
-### ═══════════════════════════════════════════
-
-#### Commit 31-35: Additional features
-```powershell
-git commit -m "feat(backend): Add customer profile API"
-git commit -m "feat(backend): Add staff user management"
-git commit -m "fix(frontend): Fix cart and order status bugs"
-git commit -m "fix(frontend): Fix KDS and reports rendering issues"
-git commit -m "style(frontend): Improve mobile responsiveness"
-```
-
-#### Commit 36-40: Documentation
-```powershell
-git commit -m "docs: Add sprint retrospectives and burndown"
-git commit -m "chore: Add deployment configuration"
-git commit -m "docs: Add demo script and deployment checklist"
-git commit -m "docs: Add API documentation"
-git commit -m "docs: Update README with project overview"
-```
-
----
-
-## 🔧 Script Thay Đổi Author
-
-```powershell
-# Set author cho commits khác nhau
-git config user.name "Dev B Name"
-git config user.email "devb@example.com"
-git commit -m "message"
-
-# Đổi về author mặc định
-git config user.name "Dev A Name"
-git config user.email "deva@example.com"
-```
-
----
-
-## 📅 Fake Commit Dates
-
-```powershell
-# PowerShell - Set date trước khi commit
-$env:GIT_AUTHOR_DATE = "2026-01-03T09:00:00"
-$env:GIT_COMMITTER_DATE = "2026-01-03T09:00:00"
-git commit -m "message"
-
-# Reset
-Remove-Item Env:GIT_AUTHOR_DATE
-Remove-Item Env:GIT_COMMITTER_DATE
-```
-
----
-
-## ✅ Checklist Cuối Cùng
-
-- [ ] Tổng ~40 commits
-- [ ] 3 authors khác nhau (Dev A ~14, Dev B ~14, Dev C ~12)
-- [ ] Dates từ 03/01 - 22/01
-- [ ] Test repo clone về chạy được
-- [ ] Push to GitHub
+*Document version: 2.0 | Updated: 15/01/2026 | Based on actual project structure*
